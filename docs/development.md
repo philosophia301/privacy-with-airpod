@@ -537,6 +537,7 @@ EdDSA 비밀 키는 `generate_keys --account privacy-airpods`로 만들어 이 M
   - 서버를 끈 채 구판본을 실행하면 설정 창이 막히지 않음.
 - 실제 공개(2026-11-11, 사용자 승인): `publish-update.py`로 GitHub Release `v0.1.2`(태그는 판본 커밋 `224f720`)를 만들고 appcast 항목을 main에 push함. Release 주소에서 받은 DMG는 크기와 SHA-256이 원본과 같고, quarantine을 붙여도 `spctl` accepted `Notarized Developer ID`임. raw appcast는 push 뒤 약 3분 30초 만에 새 항목을 돌려줌(`cache-control: max-age=300`).
 - 실제 주소 업데이트: 0.1.2 앱을 0.1.1(빌드 2)로 바꿔 다시 서명한 사본을 scratchpad에서 실행함. 실제 raw appcast에서 0.1.2를 일반 업데이트(나중에, 설치, 건너뛰기)로 제안했고 설정 창은 막히지 않음. 설치를 고르면 GitHub에서 받고 EdDSA 확인 뒤 "설치 & 재실행"으로 교체함. 교체된 앱은 0.1.2(빌드 3)이고 실행 파일이 배포 산출물과 같으며 `spctl` accepted `Notarized Developer ID`, 재실행 뒤 추가 제안 없음. 이번에도 마지막 클릭은 자동 조작이 오류를 반환했으나 직후 설치가 진행되어, 클릭 직후 창이 바뀌어 검증만 실패한 것으로 봄. 시험 뒤 실제 앱 ID의 사용자 기본값에 생긴 `SULastCheckTime`, `SUUpdateGroupIdentifier`와 캐시 폴더를 지움.
+- 실제 설치본 업데이트(2026-11-11, 사용자 지시): 새 아이콘이 든 0.1.3(빌드 4)을 필수 표시 없이 공개함. 태그 `v0.1.3`은 판본 커밋 `6e313a5`, appcast 커밋은 `9797626`. Release에서 받은 DMG의 SHA-256이 원본과 같음(`54a9aeaa…`, 1,894,012바이트). raw appcast는 push 직후 새 항목을 돌려줌. `/Applications`의 실제 0.1.2(빌드 3)를 다시 실행하자 실행 시 확인으로 0.1.3을 일반 업데이트(나중에, 업데이트 설치, 이 버전 건너뛰기)로 제안함. 업데이트 설치 → 내려받기와 "설치 준비 완료" → "설치 & 재실행"으로 같은 경로가 0.1.3(빌드 4)으로 바뀌고 재실행됨. 교체된 앱은 `codesign --verify --strict --deep` 통과, `spctl` accepted `Notarized Developer ID`이며 메뉴의 업데이트 확인이 "0.1.3 이(가) 현재 최신 버전입니다"를 보여줌. 마지막 클릭은 이번에도 자동 조작이 결과를 돌려주기 전에 앱이 종료되어 응답이 비었고 직후 설치가 진행됨.
 - `publish-update.py`의 거부 경로: 같은 빌드 재게시, 이번 빌드보다 높은 필수 기준, 판본과 다른 DMG 이름에서 appcast를 바꾸지 않고 종료 1.
 - 시험 뒤 시험 번들의 사용자 기본값과 캐시를 지웠음. 시험 폴더는 scratchpad에만 있음.
 
@@ -573,8 +574,9 @@ EdDSA 비밀 키는 `generate_keys --account privacy-airpods`로 만들어 이 M
 - `iconutil --convert iconset`으로 되풀어 16~512pt 1x, 2x 10장을 확인함.
 - `APP_DIR`을 scratchpad로 둔 `./scripts/build-app.sh`(개발 인증서) 조립에서 `Contents/Resources/AppIcon.icns`가 저장소 파일과 같고, `CFBundleIconFile`이 있으며, `codesign --verify --strict --deep`가 통과함.
 - `NSWorkspace.icon(forFile:)`로 받은 시스템 아이콘이 새 아이콘으로 보임(macOS 27). 시스템이 둥근 사각형 가장자리에 자체 테두리 효과를 더하며, 규격 밖 아이콘을 회색 틀 안에 작게 넣는 처리는 없었음. 같은 방법으로 본 설치본 0.1.2는 기본 아이콘임.
+- 0.1.3 배포(2026-11-11): release 조립, 공증, ticket 첨부, `spctl` 통과. Sparkle로 교체된 `/Applications` 앱의 `AppIcon.icns`가 저장소 파일과 같고, `NSWorkspace.icon(forFile:)`(Finder가 쓰는 시스템 아이콘)과 Sparkle의 "최신 버전입니다" 창이 새 아이콘을 보여줌. 업데이트 제안 창은 실행 중인 구판본의 아이콘을 쓰므로 0.1.2에서 올 때는 기본 아이콘으로 보임. 앱 아이콘이 0.7MB라 DMG가 1.19MB에서 1.89MB로 커짐.
 
 ### 남은 위험
 
 - 원본이 282×222라 512px 이상으로 크게 보면 외곽선이 조금 부드러움. 고해상도 원본을 받으면 같은 스크립트로 다시 만들 수 있으나 오리기 결과를 다시 봐야 함.
-- Finder, Dock, Sparkle 창에서의 실제 표시와 release 조립, 공증은 다음 배포 판본에서 확인함.
+- Dock 표시는 Dock 자동 숨김 때문에 화면으로 보지 않았음. Dock도 같은 번들 아이콘을 쓰므로 다르게 보일 이유는 확인되지 않음.
