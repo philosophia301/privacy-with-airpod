@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Combine
 
 @main
 enum Launch {
@@ -16,8 +17,20 @@ enum Launch {
 }
 
 struct PrivacyAirPodsApp: App {
-    @StateObject private var model = AppModel()
+    @StateObject private var model: AppModel
     @StateObject private var updater = SparkleUpdater()
+    @StateObject private var icon: MenuBarIconModel
+
+    init() {
+        let model = AppModel()
+        _model = StateObject(wrappedValue: model)
+        _icon = StateObject(wrappedValue: MenuBarIconModel(
+            frames: MenuBarIconModel.bundledFrames,
+            protection: model.$protected.eraseToAnyPublisher(),
+            clock: SystemMenuBarIconClock(),
+            reduceMotion: { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion },
+            workspaceNotifications: NSWorkspace.shared.notificationCenter))
+    }
 
     private var experimentScene: some Scene {
         Window("Privacy AirPods · 실험", id: "experiment") {
@@ -32,8 +45,10 @@ struct PrivacyAirPodsApp: App {
 
     var body: some Scene {
         experimentScene.defaultLaunchBehavior(.presented)
-        MenuBarExtra("Privacy AirPods", systemImage: model.protected ? "eye.slash.fill" : "eye") {
+        MenuBarExtra {
             MenuContent(model: model, update: updater.state)
+        } label: {
+            MenuBarIconLabel(model: icon)
         }
     }
 }
@@ -44,6 +59,8 @@ private struct MenuContent: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
+        Text(MenuBarVersionText.current)
+        Divider()
         Text(model.captureStatus)
         Text(model.motionStatus)
         Divider()

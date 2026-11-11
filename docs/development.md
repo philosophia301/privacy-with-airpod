@@ -566,7 +566,7 @@ EdDSA 비밀 키는 `generate_keys --account privacy-airpods`로 만들어 이 M
 
 ### 다시 만들기
 
-`scripts/make-app-icon.py`를 실행하면 `Resources/AppIcon.icns`를 덮어씀. `--png <경로>`를 붙이면 1024px 원본도 저장함. Pillow와 numpy가 필요함. 같은 입력이면 같은 파일이 나옴.
+`scripts/make-app-icon.py`를 실행하면 `Resources/AppIcon.icns`를 덮어씀. `--png <경로>`를 붙이면 1024px 원본도 저장함. Pillow와 numpy가 필요함. 재실행 결정성은 아직 확인하지 않음.
 
 ### 검증
 
@@ -580,3 +580,60 @@ EdDSA 비밀 키는 `generate_keys --account privacy-airpods`로 만들어 이 M
 
 - 원본이 282×222라 512px 이상으로 크게 보면 외곽선이 조금 부드러움. 고해상도 원본을 받으면 같은 스크립트로 다시 만들 수 있으나 오리기 결과를 다시 봐야 함.
 - Dock 표시는 Dock 자동 숨김 때문에 화면으로 보지 않았음. Dock도 같은 번들 아이콘을 쓰므로 다르게 보일 이유는 확인되지 않음.
+
+## 메뉴 막대 아이콘 — 2026-11-12
+
+사용자 결정은 [spec](spec.md#메뉴-막대-아이콘--2026-11-12-사용자-결정)이 소유함. 메뉴 막대 아이콘은 앱 아이콘과 같은 원본 캐릭터를 쓰고, 흐림 단계별 그림 25장을 미리 만든 뒤 앱이 시각에 맞춰 골라 보여줌. 흐림 수치는 이 절에 복사하지 않고 스크립트와 코드 상수가 소유함.
+
+### 구성
+
+| 경로 | 역할 |
+| --- | --- |
+| `scripts/make-menu-bar-icon.py` | 메뉴 막대 프레임 25장 생성. 캐릭터 마스크와 원본 경로는 `scripts/make-app-icon.py`를 불러 재사용하며 그 파일은 고치지 않음. 흐림 결정값은 파일 머리에 있음 |
+| `Resources/MenuBarIcon/` | `blur-00.png`부터 `blur-24.png`까지 25장, 44×36px RGBA. blur-00은 흐림 없음, blur-24는 최대 흐림. 스크립트 산출물이며 앱은 이 파일만 읽음 |
+| `Sources/PrivacyAirPods/MenuBarIcon.swift` | 리듬 규칙(`MenuBarBlurRhythm`), 프레임 로드와 색 유지(template 끔), 주기 갱신(`MenuBarIconModel`), 메뉴 라벨, 판본 문구. 프레임이 없으면 SF Symbol 눈으로 대체 |
+| `Sources/PrivacyAirPods/PrivacyAirPodsApp.swift` | `MenuBarExtra`의 label을 `MenuBarIconLabel`로 두고 메뉴 맨 위에 판본 문구를 둠 |
+| `scripts/build-app.sh` | `Resources/MenuBarIcon`을 앱 번들 `Contents/Resources/MenuBarIcon`에 기존 복사본을 지운 뒤 복사하고, 그다음 서명함 |
+
+### 리듬과 갱신 방식
+
+보호가 시작된 시각을 기준으로 한 주기를 반복함. 정지 구간은 다음 구간 경계까지 예약 한 번만 두고 프레임을 바꾸지 않음. 전환 구간에서만 10fps Timer가 프레임 번호를 바꿈. 꺼짐과 손쉬운 사용 동작 줄이기에서는 예약이 없음.
+
+```
+보호 켬 → 흐려짐(전환, 10fps) → 흐림 유지(정지) → 걷힘(전환, 10fps) → 선명(정지) → 흐려짐 …
+보호 끔 → 즉시 선명, 예약 취소
+```
+
+보호 상태나 동작 줄이기 설정이 바뀌면 이전 예약을 모두 취소하고 현재 시각에 맞춰 다시 계산함. 시계는 `MenuBarIconClock`으로 주입받아 테스트가 수동 시계로 경계 시각을 확인함.
+
+전환 갱신을 10fps로 둔 이유는 `MenuBarExtra` label 갱신 비용임. 같은 프레임과 같은 리듬으로 메뉴 막대 아이콘만 바꾸는 시험 앱을 30초씩 재면 평균 CPU(코어 하나 기준)가 아래와 같았음.
+
+| 방식 | 평균 CPU |
+| --- | --- |
+| SwiftUI `MenuBarExtra` label, 15fps | 약 6.3~7.1%(5회 중 4회), 1회는 약 2.9% |
+| SwiftUI `MenuBarExtra` label, 10fps | 약 2.3% |
+| SwiftUI `MenuBarExtra` label, 8fps | 약 1.7% |
+| AppKit `NSStatusItem` 직접 갱신, 15fps | 약 1.9~2.1% |
+
+10fps는 AppKit 직접 갱신과 비슷한 비용이면서 메뉴를 AppKit으로 다시 만들지 않아도 됨. 2초 전환이 느려 10fps에서도 끊김이 눈에 띄지 않는 것은 시험 앱으로만 봤음.
+
+### 다시 만들기
+
+`python3 scripts/make-menu-bar-icon.py`를 실행하면 `Resources/MenuBarIcon/` 25장을 덮어씀. Pillow와 numpy가 필요함. 같은 입력이면 같은 파일이 나옴. 원본 그림이나 캐릭터 마스크를 바꾸면 [앱 아이콘 절](#앱-아이콘--2026-11-11)의 `make-app-icon.py`를 먼저 맞춘 뒤 이 스크립트를 다시 실행함.
+
+### 검증
+
+- 생성: 25장이 시안에 쓴 기준 프레임과 픽셀 차이 0임. 스크립트를 두 번 더 실행해도 25장을 이은 SHA-256이 같음.
+- `swift test --filter MenuBarIcon`: 8개 통과. 보호 시작 뒤 0~21초 경계 프레임과 두 번째 주기, 정지 구간에 반복 예약 없음, 전환 중 보호를 끄면 즉시 선명하고 예약이 남지 않음, 동작 줄이기 정지와 실행 중 변경, 프레임 하나가 빠지면 SF Symbol로 대체하고 예약 없음, 프레임 25장이 22×18pt 컬러로 읽힘, 판본 문구를 확인함. 보호 상태는 실제 `AppModel`과 가림 창(`ProtectionHarness`)으로 만들고 시계와 동작 줄이기 설정만 대역임.
+- 결함 주입: 흐려짐과 걷힘 순서를 바꾸면 리듬 테스트와 동작 줄이기 테스트가 실패함. 보호를 꺼도 예약을 취소하지 않게 바꾸면 끄기 테스트가 실패함. 되돌린 뒤 통과함.
+- 전체 `swift test`: XCTest 6개, Swift Testing 51개 통과.
+- 조립: `APP_DIR`을 scratchpad로 둔 `./scripts/build-app.sh`(개발 인증서)에서 번들 안 `MenuBarIcon` 25장이 저장소와 같고 `codesign --verify --strict --deep`가 통과함.
+- 실행 앱(꺼짐): 조립한 개발 빌드를 실행하자 메뉴 막대에 선명한 컬러 아이콘이 보이고, 메뉴 맨 위에 `버전 0.1.3 (빌드 4)`가 보임. 꺼짐 상태의 CPU는 0~0.2%임.
+- 보호 중 리듬: 실제 앱에서는 AirPods 입력과 보정이 있어야 보호를 켤 수 있어 보지 않았음. 같은 프레임을 `MenuBarExtra` label로 바꾸는 시험 앱에서 흐림이 실제로 움직이는 것만 확인함.
+
+### 남은 위험
+
+- 보호 중 10초 리듬과 동작 줄이기 정지는 실제 AirPods 보호에서 눈으로 보지 않았음.
+- 전환 구간 CPU는 시험 앱 수치임. 이 앱의 보호 중 렌더링 부하와 겹친 실제 수치는 측정 전임.
+- 원본이 282×222px이라 22×18pt 표시의 세부가 원본 해상도에 묶임.
+- 메뉴 막대 status item은 이 macOS에서 앱 소유 CGWindow로 잡히지 않아, 실물 확인은 메뉴 막대 영역 화면 캡처로만 함.

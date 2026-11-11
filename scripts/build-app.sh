@@ -33,6 +33,14 @@ cp "$binary" "$app_dir/Contents/MacOS/PrivacyAirPods"
 cp Resources/Info.plist "$app_dir/Contents/Info.plist"
 # 앱 아이콘. 원본에서 다시 만들 때는 scripts/make-app-icon.py를 씀.
 cp Resources/AppIcon.icns "$app_dir/Contents/Resources/AppIcon.icns"
+# 메뉴 막대 아이콘 프레임(컬러 PNG 25장). 앱이 번들에서 읽고, 하나라도 없으면 SF Symbol 눈으로 대체함.
+menu_bar_frames=$(find Resources/MenuBarIcon -maxdepth 1 -name 'blur-[0-9][0-9].png' 2>/dev/null | wc -l | tr -d ' ')
+if [[ "$menu_bar_frames" != 25 ]]; then
+    echo "Resources/MenuBarIcon에 blur-00~blur-24 25장이 필요함(현재 $menu_bar_frames장). python3 scripts/make-menu-bar-icon.py로 다시 만듦." >&2
+    exit 1
+fi
+rm -rf "$app_dir/Contents/Resources/MenuBarIcon"
+cp -R Resources/MenuBarIcon "$app_dir/Contents/Resources/MenuBarIcon"
 sign_options=(--force --sign "$signing_identity")
 if [[ "$configuration" == release ]]; then
     # 공증 필수 조건: hardened runtime과 Apple 보안 타임스탬프.
