@@ -1,6 +1,13 @@
 #import "PrivacyBackdrop.h"
 #import <dlfcn.h>
 
+// 소유 Space 수명 진단 기록. Lab과 테스트가 쓰는 debug 빌드에만 남기고 배포(release) 빌드에는 넣지 않음.
+#if DEBUG
+#define PBTrace(...) do { printf(__VA_ARGS__); fflush(stdout); } while (0)
+#else
+#define PBTrace(...) do { } while (0)
+#endif
+
 static void PBError(NSError **outError, NSString *message) {
     if (outError) *outError = [NSError errorWithDomain:@"PrivacyBackdropProbe" code:1
         userInfo:@{NSLocalizedDescriptionKey: message}];
@@ -104,7 +111,7 @@ BOOL PBUpdateMask(CALayer *layer, CGImageRef mask, double radius, NSError **erro
     _space = create(_connection, 1, NULL);
     if (!_space) { PBError(error, @"Auxiliary composition space creation failed"); return nil; }
     level(_connection, _space, 1);
-    printf("OWNED_SPACE CREATED %llu\n", _space); fflush(stdout);
+    PBTrace("OWNED_SPACE CREATED %llu\n", _space);
     return self;
 }
 - (BOOL)attachWindow:(NSWindow *)window error:(NSError **)error {
@@ -115,11 +122,13 @@ BOOL PBUpdateMask(CALayer *layer, CGImageRef mask, double radius, NSError **erro
     _add(_connection, (__bridge CFArrayRef)windows, (__bridge CFArrayRef)spaces);
     _show(_connection, (__bridge CFArrayRef)spaces);
     CFArrayRef actual = _windowSpaces(_connection, 15, (__bridge CFArrayRef)windows);
+#if DEBUG
     NSLog(@"OWNED_SPACE MEMBERSHIPS %@", (__bridge NSArray *)actual);
+#endif
     BOOL attached = actual && [(__bridge NSArray *)actual containsObject:@(_space)];
     if (actual) CFRelease(actual);
     if (!attached) { PBError(error, @"Auxiliary space attachment was not confirmed"); return NO; }
-    printf("OWNED_SPACE ATTACHED %llu %ld\n", _space, (long)window.windowNumber); fflush(stdout);
+    PBTrace("OWNED_SPACE ATTACHED %llu %ld\n", _space, (long)window.windowNumber);
     return YES;
 }
 - (void)close {
@@ -127,7 +136,7 @@ BOOL PBUpdateMask(CALayer *layer, CGImageRef mask, double radius, NSError **erro
     uint64_t owned = _space; _space = 0;
     _hide(_connection, (__bridge CFArrayRef)@[@(owned)]);
     _destroy(_connection, owned);
-    printf("OWNED_SPACE DESTROYED %llu\n", owned); fflush(stdout);
+    PBTrace("OWNED_SPACE DESTROYED %llu\n", owned);
 }
 - (void)dealloc { [self close]; }
 @end
