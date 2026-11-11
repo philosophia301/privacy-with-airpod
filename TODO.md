@@ -11,8 +11,9 @@
 - [x] 상태 주입 테스트를 실제 가림 창 마스크를 관측하는 e2e(`ProtectionFlowTests`)로 교체. 내장 화면 의존 제거. 결함 주입 8종 중 7종 검출, 1종은 동등한 중복 안전장치.
 - [x] 진단 빌드 회귀(swiftbuild object 경로) 수정, Blur Lab 빌드와 진단 10/10 확인.
 - [x] 배포 후보 `--smoke-test` 추가. hardened runtime Developer ID 실행 파일에서 실제 가림 시작·갱신·종료 확인.
-- [ ] Git 저장소 초기화와 기준 커밋: 사용자 승인 필요. 현재 회귀 비교는 `.build/baselines/` snapshot에만 의존함.
-- [ ] 설정 창의 sample마다 전체 재표시와 배포 앱의 Space 진단 로그는 측정이나 진단 정리 후 결정.
+- [x] Git 초기화, 기준 커밋과 정리 커밋, public `philosophia301/privacy-with-airpod` push(사용자 지시).
+- [x] 설정 창의 sample마다 전체 재계산을 `LiveReadout` 분리로 해소, 배포 빌드의 Space 진단 로그 제거.
+- [ ] 정리 뒤 판본의 공증 DMG 재배포: 버전 증가와 공증 제출 시점은 사용자가 정함.
 
 ## 최신 작업 — 본인 계정 DMG 직접 배포 (2026-11-11)
 

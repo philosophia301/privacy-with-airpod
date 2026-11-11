@@ -3,15 +3,25 @@ import Combine
 import PrivacyCore
 import CoreImage
 
+/// 센서 sample과 미리보기 프레임마다 바뀌는 표시값. 이 값을 쓰는 작은 view만 관찰하게 해
+/// 설정 창과 메뉴 전체가 sample마다 다시 계산되지 않게 함. 보호 판정은 이 값을 읽지 않음.
+@MainActor
+final class LiveReadout: ObservableObject {
+    @Published fileprivate(set) var sampleCount = 0
+    /// 책상 정면 기준 현재 고개 각도(도). 오른쪽 회전이 양수이며 보정 전에는 0임.
+    @Published fileprivate(set) var angle = 0.0
+    @Published fileprivate(set) var previewImage: CGImage?
+}
+
 /// 보정, 배치, 실제 보호, 입력 중단 정책을 소유함. 화면 표시 상태는 흐름 함수로만 바뀜.
+/// 여기의 published 값은 상태가 바뀔 때만 갱신하고, sample마다 바뀌는 값은 `readout`에 둠.
 @MainActor
 final class AppModel: ObservableObject {
     @Published private(set) var displays: [DisplayCalibration] = []
     @Published var selectedDisplay: CGDirectDisplayID = 0
     @Published private(set) var motionStatus = "AirPods 연결 확인 전"
     @Published private(set) var captureStatus = "보호 꺼짐"
-    @Published private(set) var sample: HeadSample?
-    @Published private(set) var sampleCount = 0
+    private(set) var sample: HeadSample?
     @Published private(set) var receiving = false
     @Published private(set) var protected = false
     @Published private(set) var startingProtection = false
@@ -25,17 +35,17 @@ final class AppModel: ObservableObject {
     }
     @Published var demo = true
     @Published var demoAngle = 0.0
-    @Published var direction = -1.0
+    @Published var direction = -1.0 { didSet { refreshAngle() } }
     @Published var maximumBlur = 31.25
     @Published var responseTime = 0.18
     @Published var connectionWidth = 25.0
     @Published var startAngle = 35.0
     @Published private(set) var deskReference: Double?
     @Published private(set) var appliedPoses: [DisplayPose] = []
-    @Published private(set) var previewImage: CGImage?
     @Published private(set) var probe = InertialProbe()
     @Published private(set) var probing = false
     @Published var trialLabel = "앉은 채 정지"
+    let readout = LiveReadout()
 
     private let motion: HeadMotionSource
     private let clock: FrameClock
@@ -71,8 +81,8 @@ final class AppModel: ObservableObject {
         self.clock = clock
         self.connectedDisplays = connectedDisplays
         lastTick = clock.now
-        previewRenderer.onFrame = { [weak self] frame in self?.previewImage = frame.image }
-        previewRenderer.onFailure = { [weak self] in self?.previewImage = nil }
+        previewRenderer.onFrame = { [weak self] frame in self?.readout.previewImage = frame.image }
+        previewRenderer.onFailure = { [weak self] in self?.readout.previewImage = nil }
         refreshDisplays()
         motion.onSample = { [weak self] value in self?.receive(value) }
         motion.onError = { [weak self] error in self?.invalidateMotion(error) }
@@ -120,6 +130,7 @@ final class AppModel: ObservableObject {
         deskReference = sample.yaw
         filteredYaw = sample.yaw
         demo = false
+        refreshAngle()
     }
 
     func startProbe() {
@@ -248,6 +259,11 @@ final class AppModel: ObservableObject {
         reconcileTicking()
     }
 
+    private func refreshAngle() {
+        let angle = currentAngle
+        if readout.angle != angle { readout.angle = angle }
+    }
+
     private var liveGaze: Double? {
         guard let deskReference, let filteredYaw else { return nil }
         return BlurProfile.relativeDegrees(current: filteredYaw, reference: deskReference) * direction
@@ -261,10 +277,12 @@ final class AppModel: ObservableObject {
             else if value.timestamp <= previous.timestamp { return }
         }
         sample = value
-        receiving = true
+        if !receiving { receiving = true }
         reconcileTicking()
-        sampleCount += 1
-        motionStatus = "입력 수신 중 · \(sampleCount) samples · 이어버드 \(value.source)"
+        readout.sampleCount += 1
+        refreshAngle()
+        let status = "입력 수신 중 · 이어버드 \(value.source)"
+        if motionStatus != status { motionStatus = status }
         if probing {
             probe.ingest(timestamp: value.timestamp, acceleration: value.acceleration, gravity: value.gravity)
             if probe.duration >= 10 { stopProbe() }
@@ -278,6 +296,7 @@ final class AppModel: ObservableObject {
         probing = false
         deskReference = nil
         filteredYaw = nil
+        refreshAngle()
         reconcileTicking()
         guard protected || startingProtection else { return }
         if retainBlurOnInputLoss {

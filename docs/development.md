@@ -434,7 +434,7 @@ build-app.sh(release, hardened runtime) → --smoke-test → DMG 조립·서명 
 
 ## 코드 품질 정리 — 2026-11-11
 
-사용자가 확장성, 테스트 품질(억지 unit보다 e2e 위주), bad smell과 회귀 점검을 요청하고 저장소 소유를 위임함. 정리 전 상태는 `.build/baselines/before-quality-20261111.tar.gz`에 보관함. Git 저장소가 아니어서 이력 비교는 이 snapshot 기준임.
+사용자가 확장성, 테스트 품질(억지 unit보다 e2e 위주), bad smell과 회귀 점검을 요청하고 저장소 소유를 위임함. 정리 전 상태는 Git 첫 커밋(`chore: 품질 정리 전 기준 판본 추가`)이며 정리는 두 번째 커밋임. 저장소는 사용자 지시로 public `philosophia301/privacy-with-airpod`에 올렸음. 공개 전에 다른 팀 인증서 이름과 팀 ID를 이력 기록에서 사용자 팀 기준 표현으로 바꿨음.
 
 ### 발견과 조치
 
@@ -476,8 +476,13 @@ build-app.sh(release, hardened runtime) → --smoke-test → DMG 조립·서명 
 - 디버그 실행 파일의 `--smoke-test` 종료 0. `./scripts/build-app.sh`로 조립한 개발 앱이 880×760 설정 창을 열고 정상 종료함. Developer ID `--no-notarize` 결과는 위 DMG 검증에 기록함.
 - 제품 소스는 2243줄에서 2027줄, 테스트는 1060줄에서 958줄로 줄었음.
 
+### 후속 정리
+
+- 설정 창과 메뉴가 sample마다 다시 계산되던 문제: `AppModel`이 sample, sample 수, 상태 문구를 매번 publish했음. sample 수, 현재 각도, 미리보기 프레임은 `LiveReadout`으로 옮기고 이를 쓰는 작은 view만 관찰하게 함. 상태 문구에는 sample 수를 넣지 않고 값이 바뀔 때만 갱신함. e2e `steadyHeadInputRedrawsOnlyLiveReadoutNotWholeSettingsWindow`가 고개 유지 2초(sample 40개) 동안 `AppModel` 변경 알림 0회와 가림 마스크 추종을 함께 확인함. 결함 3종(수신 상태 매번 갱신, 상태 문구에 sample 수 포함, 입력 중단 뒤 각도 미갱신)을 넣으면 실패함.
+- 배포 앱의 Space 진단 로그: `PrivacyBackdrop.m`의 `OWNED_SPACE` 기록을 `DEBUG` 빌드에만 남김. release 실행 파일의 문자열 0개, debug 4개를 확인함. Lab과 테스트는 debug object를 쓰므로 기존 진단 로그가 유지됨.
+- 검증: `swift test` 종료 0(앱 Swift Testing 30개), Blur Lab 빌드, 진단 10/10, Developer ID `--no-notarize`와 release `--smoke-test` 통과. 개발 앱에서 미리보기가 표시되고 수동 각도 +60°에 따라 바뀌는 것을 화면으로 확인함.
+
 ### 남은 위험
 
-- 설정 창 전체가 sample마다 다시 그려짐(`sampleCount`, `motionStatus` 갱신). 기능 문제는 없으나 전력 측정 전이므로 바꾸지 않았음.
-- `PrivacyBackdrop.m`이 소유 Space 생성과 종료를 stdout과 NSLog에 기록함. 진단 로그 대조에 쓰이므로 유지했으나 배포 앱에서도 남음.
 - 보호 중 설정 창이 가림 위로 올라오는 동작은 창 레벨 단위 검사로만 확인했으며 실제 AirPods 보호 중 화면 확인은 하지 않았음.
+- 공증된 0.1.0 DMG는 정리 전 판본임. 새 판본 배포는 버전 증가와 공증 제출이 필요함.

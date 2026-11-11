@@ -20,7 +20,6 @@ struct SpatialSetupView: View {
         _selected = State(initialValue: initial.first?.id ?? 0)
     }
 
-    private var gaze: Double { manual ? yaw : model.currentAngle }
     private var valid: Bool { !poses.isEmpty && poses.allSatisfy { $0.compiled() != nil } }
 
     var body: some View {
@@ -35,11 +34,13 @@ struct SpatialSetupView: View {
                     Text("입체").tag(0); Text("위에서").tag(1); Text("정면").tag(2)
                 }.pickerStyle(.segmented).frame(width: 230)
             }
-            SpatialScene(poses: poses, selected: $selected, gaze: gaze, start: model.startAngle,
-                         transitionFraction: model.connectionWidth / 100, radius: model.maximumBlur,
-                         armLength: armLength, avatar: avatar, camera: camera)
-                .frame(height: 300).clipShape(RoundedRectangle(cornerRadius: 16))
-                .accessibilityLabel("가상 책상과 모니터 배치. 모니터를 클릭하면 해당 모니터가 선택됩니다. 보기 버튼으로 시점을 바꿉니다.")
+            GazeReader(readout: model.readout, manualYaw: manual ? yaw : nil) { gaze in
+                SpatialScene(poses: poses, selected: $selected, gaze: gaze, start: model.startAngle,
+                             transitionFraction: model.connectionWidth / 100, radius: model.maximumBlur,
+                             armLength: armLength, avatar: avatar, camera: camera)
+                    .frame(height: 300).clipShape(RoundedRectangle(cornerRadius: 16))
+                    .accessibilityLabel("가상 책상과 모니터 배치. 모니터를 클릭하면 해당 모니터가 선택됩니다. 보기 버튼으로 시점을 바꿉니다.")
+            }
             HStack {
                 Picker("사람 모형", selection: $avatar) {
                     ForEach(HumanGuide.allCases, id: \.self) { Text($0.rawValue).tag($0) }
@@ -77,7 +78,9 @@ struct SpatialSetupView: View {
             HStack {
                 Toggle("수동 고개 회전", isOn: $manual)
                 Slider(value: $yaw, in: -100...100).disabled(!manual).accessibilityLabel("가상 고개 회전")
-                Text(String(format: "%+.0f°", gaze)).monospacedDigit()
+                GazeReader(readout: model.readout, manualYaw: manual ? yaw : nil) { gaze in
+                    Text(String(format: "%+.0f°", gaze)).monospacedDigit()
+                }
                 if !manual && !model.fresh { Text("AirPods 입력 필요").foregroundStyle(.orange) }
             }
             HStack {
@@ -100,4 +103,13 @@ struct SpatialSetupView: View {
         }
     }
 
+}
+
+/// 수동 회전이 아니면 AirPods 각도를 sample마다 반영함. 시트 전체 대신 이 부분만 LiveReadout을 관찰함.
+private struct GazeReader<Content: View>: View {
+    @ObservedObject var readout: LiveReadout
+    let manualYaw: Double?
+    @ViewBuilder let content: (Double) -> Content
+
+    var body: some View { content(manualYaw ?? readout.angle) }
 }

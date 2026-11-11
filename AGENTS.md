@@ -10,7 +10,7 @@ AirPods 착용 중 고개를 돌리거나 자리를 벗어나면 Mac 화면을 �
 | --- | --- |
 | `Package.swift` | Swift target·의존성·지원 OS |
 | `Sources/PrivacyCore/` | 각도와 블러 분포·순수 계측 계산. OS UI 의존 금지 |
-| `Sources/PrivacyAirPods/` | 앱 조립·메뉴/설정·센서·화면 어댑터. `AppModel`은 보정·배치·보호·입력 중단 정책을 소유하고 `HeadMotionSource`·`FrameClock`·화면 목록·알림 경계를 주입받음. `RenderSettings`는 화면 위치별 블러 규칙, `ScreenCover`와 `SpaceTransitionBackdrop`은 실제 보호의 독립 공간 가변 블러·정확한 마스크 캐시·창 수명, `PreviewRenderer`는 설정 미리보기 비동기 수명 소유. `DisplayLayout`은 연결 화면 조회와 물리 초기 배치 변환, `SpatialScene`은 3D 표시·모니터 클릭 선택, `LaunchOptions`는 실행 인자, `ProtectionSmokeTest`는 배포 산출물 확인을 소유함 |
+| `Sources/PrivacyAirPods/` | 앱 조립·메뉴/설정·센서·화면 어댑터. `AppModel`은 보정·배치·보호·입력 중단 정책을 소유하고 `HeadMotionSource`·`FrameClock`·화면 목록·알림 경계를 주입받음. sample마다 바뀌는 표시값은 `LiveReadout`이 소유함. `RenderSettings`는 화면 위치별 블러 규칙, `ScreenCover`와 `SpaceTransitionBackdrop`은 실제 보호의 독립 공간 가변 블러·정확한 마스크 캐시·창 수명, `PreviewRenderer`는 설정 미리보기 비동기 수명 소유. `DisplayLayout`은 연결 화면 조회와 물리 초기 배치 변환, `SpatialScene`은 3D 표시·모니터 클릭 선택, `LaunchOptions`는 실행 인자, `ProtectionSmokeTest`는 배포 산출물 확인을 소유함 |
 | `Sources/PrivacyBackdrop/` | 본체와 Lab이 공유하는 Objective-C backdrop/독립 합성 공간 어댑터. 비공개 API 경계·오류·소유 공간 정리 |
 | `Tests/PrivacyAppTests/` | 실제 Core Image 렌더링·앱 어댑터 검증. `ProtectionFlowTests`는 실제 가림 창 마스크를 관측하는 사용자 흐름 e2e, `Support/ProtectionHarness.swift`는 AirPods·시계·알림 대역을 소유함 |
 | `Tests/PrivacyCoreTests/` | 각도 경계·독립 입력으로 검증하는 계측 테스트 |

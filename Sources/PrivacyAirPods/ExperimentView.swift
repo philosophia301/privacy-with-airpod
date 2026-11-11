@@ -14,6 +14,7 @@ struct ExperimentView: View {
                     Button("입력 중지") { model.stopMotion() }
                     Spacer()
                     Text(model.motionStatus).font(.caption).foregroundStyle(model.fresh ? .green : .secondary)
+                    if model.receiving { LiveSampleCount(readout: model.readout) }
                 }
                 calibration
                 panorama
@@ -83,7 +84,11 @@ struct ExperimentView: View {
                     Picker("미리볼 화면", selection: $model.selectedDisplay) {
                         ForEach(model.displays) { Text($0.name).tag($0.id) }
                     }.frame(maxWidth: 240)
-                    Text(String(format: "%+.1f°", model.demo ? model.demoAngle : model.currentAngle)).monospacedDigit()
+                    if model.demo {
+                        Text(String(format: "%+.1f°", model.demoAngle)).monospacedDigit()
+                    } else {
+                        LiveAngle(readout: model.readout)
+                    }
                 }
                 if model.demo {
                     HStack {
@@ -95,12 +100,7 @@ struct ExperimentView: View {
                     Toggle("좌우 방향 반전 · 실물 확인용", isOn: Binding(get: { model.direction > 0 }, set: { model.direction = $0 ? 1 : -1 }))
                         .disabled(model.protected)
                 }
-                if let image = model.previewImage {
-                    Image(decorative: image, scale: 1)
-                        .resizable().aspectRatio(800.0 / 420, contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .accessibilityLabel("앱이 만든 예제 화면의 블러 미리보기")
-                }
+                LivePreviewImage(readout: model.readout)
                 HStack {
                     Text("효과 농도")
                     Slider(value: $model.maximumBlur, in: 15...80)
@@ -162,6 +162,32 @@ struct ExperimentView: View {
                 Text("정지 상태에서 값이 계속 변하면 추정 오차임. 동작 이름은 사람이 정한 비교 조건이며 센서가 판정한 결과가 아님.")
                     .font(.caption).foregroundStyle(.secondary)
             }.padding(8)
+        }
+    }
+}
+
+// 아래 view만 LiveReadout을 관찰함. sample과 미리보기 프레임마다 설정 창 전체를 다시 계산하지 않음.
+
+private struct LiveSampleCount: View {
+    @ObservedObject var readout: LiveReadout
+    var body: some View {
+        Text("\(readout.sampleCount) samples").font(.caption).monospacedDigit().foregroundStyle(.secondary)
+    }
+}
+
+private struct LiveAngle: View {
+    @ObservedObject var readout: LiveReadout
+    var body: some View { Text(String(format: "%+.1f°", readout.angle)).monospacedDigit() }
+}
+
+private struct LivePreviewImage: View {
+    @ObservedObject var readout: LiveReadout
+    var body: some View {
+        if let image = readout.previewImage {
+            Image(decorative: image, scale: 1)
+                .resizable().aspectRatio(800.0 / 420, contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .accessibilityLabel("앱이 만든 예제 화면의 블러 미리보기")
         }
     }
 }

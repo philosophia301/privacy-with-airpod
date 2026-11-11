@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import Testing
 import PrivacyCore
 @testable import PrivacyAirPods
@@ -190,6 +191,30 @@ struct ProtectionFlowTests {
         // 보정 뒤 입력이 끊기면 다시 거부함.
         for _ in 0..<16 { h.clock.advance() }
         await expectRefused()
+    }
+
+    @Test func steadyHeadInputRedrawsOnlyLiveReadoutNotWholeSettingsWindow() async throws {
+        let h = try ProtectionHarness()
+        defer { h.model.stopProtection() }
+        let panel = try await h.protect()
+        var modelChanges = 0
+        var readoutChanges = 0
+        let watchers = [h.model.objectWillChange.sink { _ in modelChanges += 1 },
+                        h.model.readout.objectWillChange.sink { _ in readoutChanges += 1 }]
+        defer { watchers.forEach { $0.cancel() } }
+        let countBefore = h.model.readout.sampleCount
+
+        h.hold(right: 45)
+        // 보호는 sample을 따라가지만 설정 창과 메뉴가 관찰하는 상태는 그대로임.
+        #expect(try h.maskAlpha(panel) == [255, 255, 0])
+        #expect(modelChanges == 0)
+        #expect(readoutChanges >= 40)
+        #expect(h.model.readout.sampleCount == countBefore + 40)
+        #expect(abs(h.model.readout.angle - 45) < 0.001)
+
+        h.model.stopMotion()
+        #expect(modelChanges > 0)
+        #expect(h.model.readout.angle == 0)
     }
 
     @Test func idleAppStopsPeriodicUpdates() async throws {
