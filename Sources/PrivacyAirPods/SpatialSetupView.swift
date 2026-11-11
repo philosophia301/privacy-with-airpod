@@ -3,6 +3,7 @@ import PrivacyCore
 
 struct SpatialSetupView: View {
     @ObservedObject var model: AppModel
+    let update: UpdateState
     @Environment(\.dismiss) private var dismiss
     @State private var poses: [DisplayPose]
     @State private var selected: UInt32
@@ -13,8 +14,9 @@ struct SpatialSetupView: View {
     @State private var camera = 0
     @State private var error: String?
 
-    init(model: AppModel) {
+    init(model: AppModel, update: UpdateState) {
         self.model = model
+        self.update = update
         let initial = model.layoutDraft
         _poses = State(initialValue: initial)
         _selected = State(initialValue: initial.first?.id ?? 0)
@@ -94,6 +96,8 @@ struct SpatialSetupView: View {
                 }.buttonStyle(.borderedProminent).disabled(!valid || model.protected || model.startingProtection)
             }
         }.padding(24).frame(width: 930)
+        // 필수 업데이트가 확인되면 시트를 닫아 설정 창의 업데이트 안내로 돌아감.
+        .onReceive(update.$requiredVersion) { if $0 != nil { dismiss() } }
     }
 
     private func adjustment(_ title: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {

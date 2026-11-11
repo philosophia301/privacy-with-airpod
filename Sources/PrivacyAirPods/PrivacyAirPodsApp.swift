@@ -17,10 +17,11 @@ enum Launch {
 
 struct PrivacyAirPodsApp: App {
     @StateObject private var model = AppModel()
+    @StateObject private var updater = SparkleUpdater()
 
     private var experimentScene: some Scene {
         Window("Privacy AirPods · 실험", id: "experiment") {
-            ExperimentView(model: model)
+            ExperimentView(model: model, update: updater.state)
                 .background(WindowLevel(aboveCover: model.protected || model.startingProtection))
                 .background(PreviewWindowLifecycle(model: model))
         }
@@ -32,13 +33,14 @@ struct PrivacyAirPodsApp: App {
     var body: some Scene {
         experimentScene.defaultLaunchBehavior(.presented)
         MenuBarExtra("Privacy AirPods", systemImage: model.protected ? "eye.slash.fill" : "eye") {
-            MenuContent(model: model)
+            MenuContent(model: model, update: updater.state)
         }
     }
 }
 
 private struct MenuContent: View {
     @ObservedObject var model: AppModel
+    let update: UpdateState
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -53,6 +55,7 @@ private struct MenuContent: View {
         }
         Button("AirPods 입력 시작") { model.startMotion() }
         Divider()
+        Button("업데이트 확인…") { update.checkForUpdates() }
         Button("종료") { model.quit() }
     }
 }

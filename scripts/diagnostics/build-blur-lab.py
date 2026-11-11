@@ -7,6 +7,8 @@ from pathlib import Path
 
 # 진단 링크는 native 빌드의 object 배치(PrivacyCore.build/*.o, PrivacyBackdrop.build)에 의존함. 기본 swiftbuild에는 이 산출물이 없음.
 SWIFT_BUILD = ['swift', 'build', '--build-system', 'native']
+# 앱 진입점과 Sparkle 연결부는 진단 앱에 넣지 않음.
+APP_ONLY_SOURCES = {'PrivacyAirPodsApp.swift', 'SparkleUpdater.swift'}
 root = Path(__file__).resolve().parents[2]
 out = root / '.build' / 'blur-lab'
 out.mkdir(parents=True, exist_ok=True)
@@ -28,7 +30,7 @@ subprocess.run([
 objects = [bin_path / 'PrivacyCore.build' / f'{p.name}.o' for p in (root / 'Sources/PrivacyCore').glob('*.swift')]
 if not objects or not all(p.exists() for p in objects):
     raise SystemExit('Build PrivacyCore with swift build first')
-sources = [p for p in (root / 'Sources/PrivacyAirPods').glob('*.swift') if p.name != 'PrivacyAirPodsApp.swift']
+sources = [p for p in (root / 'Sources/PrivacyAirPods').glob('*.swift') if p.name not in APP_ONLY_SOURCES]
 binary = out / 'PrivacyBlurLab'
 subprocess.run([
     'swiftc', '-parse-as-library', '-import-objc-header', str(root / 'scripts/diagnostics/BackdropSPI.h'),

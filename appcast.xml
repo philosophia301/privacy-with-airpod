@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+  <channel>
+    <title>Privacy AirPods</title>
+    <link>https://github.com/philosophia301/privacy-with-airpod</link>
+    <description>Privacy AirPods 업데이트. scripts/publish-update.py가 항목을 추가함.</description>
+    <language>ko</language>
+  </channel>
+</rss>

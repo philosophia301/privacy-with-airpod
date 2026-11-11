@@ -29,7 +29,7 @@ swiftc -parse-as-library -import-objc-header scripts/diagnostics/BackdropSPI.h \
 swiftc -parse-as-library scripts/diagnostics/TransitionPatternFixture.swift -o /tmp/privacy-transition-pattern-fixture
 ```
 
-전환 probe는 `PrivacyAirPodsApp.swift`를 제외한 앱 소스, PrivacyCore object, `PrivateCover.swift`, `GridMetrics.swift`, `PrivateTransitionProbe.swift`, 위 ObjC object를 링크함. 앱 번들은 제품과 별도 경로·실행 파일로 조립하며 화면 기록 권한을 갖는 로컬 개발 서명을 사용함. 제품 번들을 덮어쓰지 않음. 실험 종료 후 소유한 예제 프로세스만 종료함.
+전환 probe는 `PrivacyAirPodsApp.swift`와 Sparkle 연결부 `SparkleUpdater.swift`를 제외한 앱 소스, PrivacyCore object, `PrivateCover.swift`, `GridMetrics.swift`, `PrivateTransitionProbe.swift`, 위 ObjC object를 링크함. 앱 번들은 제품과 별도 경로·실행 파일로 조립하며 화면 기록 권한을 갖는 로컬 개발 서명을 사용함. 제품 번들을 덮어쓰지 않음. 실험 종료 후 소유한 예제 프로세스만 종료함.
 
 `/tmp/privacy-private-measure-mode`에 선택한 조건을 기록함: `off`, `plain`, `host`, `tag23`, `tag16`, `unflattened`, `moving`, `native`. 이 값은 제품 설정이 아님. probe는 준비 후 16초 관측하고 가림/스트림을 종료함. 준비 로그를 확인한 뒤 시험 앱 사이 Control+좌/우를 왕복함. 로그 경로는 매 실행 새로 지정함.
 

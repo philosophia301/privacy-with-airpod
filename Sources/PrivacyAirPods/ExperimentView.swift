@@ -3,6 +3,7 @@ import PrivacyCore
 
 struct ExperimentView: View {
     @ObservedObject var model: AppModel
+    let update: UpdateState
     @State private var showingLayout = false
 
     var body: some View {
@@ -25,7 +26,8 @@ struct ExperimentView: View {
             .padding(28)
         }
         .frame(minWidth: 780, minHeight: 620)
-        .sheet(isPresented: $showingLayout) { SpatialSetupView(model: model) }
+        .modifier(RequiredUpdateGate(state: update, protecting: model.protected || model.startingProtection))
+        .sheet(isPresented: $showingLayout) { SpatialSetupView(model: model, update: update) }
     }
 
     private var header: some View {

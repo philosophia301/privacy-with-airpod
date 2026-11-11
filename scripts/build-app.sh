@@ -20,14 +20,15 @@ fi
 # Swift 6.4 기본 swiftbuild는 실행 파일의 SDK 기록을 최소 OS(15.0)로 남겨 AppKit이 구 SDK 호환 동작을 고를 수 있음.
 build=(swift build -c "$configuration" --build-system native)
 "${build[@]}"
-binary="$("${build[@]}" --show-bin-path)/PrivacyAirPods"
+bin_path="$("${build[@]}" --show-bin-path)"
+binary="$bin_path/PrivacyAirPods"
 linked_sdk="$(vtool -show-build "$binary" | awk '$1 == "sdk" { print $2; exit }')"
 active_sdk="$(xcrun --sdk macosx --show-sdk-version)"
 if [[ "$linked_sdk" != "$active_sdk" ]]; then
     printf '실행 파일의 SDK 기록(%s)이 현재 SDK(%s)와 다름. 구 SDK 호환 동작을 막기 위해 중단함.\n' "$linked_sdk" "$active_sdk" >&2
     exit 1
 fi
-mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources"
+mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources" "$app_dir/Contents/Frameworks"
 cp "$binary" "$app_dir/Contents/MacOS/PrivacyAirPods"
 cp Resources/Info.plist "$app_dir/Contents/Info.plist"
 sign_options=(--force --sign "$signing_identity")
@@ -35,6 +36,15 @@ if [[ "$configuration" == release ]]; then
     # 공증 필수 조건: hardened runtime과 Apple 보안 타임스탬프.
     sign_options+=(--options runtime --timestamp)
 fi
+# 앱 내 업데이트. 샌드박스가 아니므로 Sparkle의 XPC 서비스는 쓰지 않음.
+# hardened runtime의 library validation을 통과하도록 안쪽 실행 파일부터 앱과 같은 인증서로 다시 서명함.
+sparkle="$app_dir/Contents/Frameworks/Sparkle.framework"
+rm -rf "$sparkle"
+ditto "$bin_path/Sparkle.framework" "$sparkle"
+rm -rf "$sparkle/XPCServices" "$sparkle/Versions/B/XPCServices"
+codesign "${sign_options[@]}" "$sparkle/Versions/B/Autoupdate"
+codesign "${sign_options[@]}" "$sparkle/Versions/B/Updater.app"
+codesign "${sign_options[@]}" "$sparkle"
 codesign "${sign_options[@]}" "$app_dir"
-codesign --verify --strict "$app_dir"
+codesign --verify --strict --deep "$app_dir"
 printf '%s\n' "$app_dir"

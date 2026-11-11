@@ -485,3 +485,61 @@ build-app.sh(release, hardened runtime) → --smoke-test → DMG 조립·서명 
 
 - 보호 중 설정 창이 가림 위로 올라오는 동작은 창 레벨 단위 검사로만 확인했으며 실제 AirPods 보호 중 화면 확인은 하지 않았음.
 - 정리 판본은 0.1.1로 다시 공증했음. 외부 공개 위치(GitHub Release 등)와 다른 Mac의 첫 실행은 미정이거나 미확인임.
+
+## 앱 내 업데이트와 필수 업데이트 — 2026-11-11
+
+사용자 결정과 네트워크 경계는 [spec](spec.md#앱-내-업데이트와-필수-업데이트--2026-11-11-사용자-결정)이 소유함. 업데이트는 Sparkle 2.10.1(판본 고정)을 씀. Sparkle은 macOS 앱 업데이트 오픈소스 라이브러리이며, appcast(판본 목록 RSS)를 읽어 새 판본을 찾고 EdDSA 서명이 맞는 파일만 설치함.
+
+```text
+실행 시 + 하루 1회 → appcast.xml(main, raw URL) → 새 항목?
+  ├─ criticalUpdate 기준보다 낮은 빌드 → UpdateState.requiredVersion → 설정 창과 배치 시트 차단
+  ├─ 일반 업데이트 → Sparkle 표준 안내
+  └─ 실패, 오프라인 → 판정 유지(막지 않음)
+업데이트 버튼 → Sparkle 표준 창 → DMG 내려받기 → EdDSA와 코드 서명 확인 → 교체, 재실행
+```
+
+### 구성
+
+| 경로 | 역할 |
+| --- | --- |
+| `Sources/PrivacyAirPods/UpdateState.swift` | 필수 판정 상태와 설정 창 차단 modifier. Sparkle을 import하지 않아 Blur Lab에도 컴파일됨 |
+| `Sources/PrivacyAirPods/SparkleUpdater.swift` | `SPUUpdater` 생성, 실행 시 확인, delegate로 판정 전달. Lab 빌드에서 제외 |
+| `Resources/Info.plist` | `SUFeedURL`(main의 raw appcast), `SUPublicEDKey`, `SUEnableAutomaticChecks`. `CFBundleDevelopmentRegion`을 `ko`로 두어 Sparkle 창도 한국어로 표시함. 없으면 앱에 지역화 폴더가 없어 영어로 나옴 |
+| `scripts/build-app.sh` | `Sparkle.framework`를 `Contents/Frameworks`에 넣고 XPC 서비스를 지운 뒤 Autoupdate, Updater.app, framework, 앱 순서로 같은 인증서로 서명. `codesign --verify --strict --deep`로 확인 |
+| `scripts/publish-update.py` | DMG 안 앱의 판본과 서명 확인, 공증 ticket 확인, EdDSA 서명, GitHub Release 생성, appcast 항목 추가 |
+| `appcast.xml` | 배포 판본 목록. 스크립트가 맨 위에 항목을 추가하고 사람이 커밋과 push를 함 |
+
+샌드박스 앱이 아니므로 Sparkle의 Installer, Downloader XPC 서비스는 쓰지 않음. hardened runtime의 library validation 때문에 framework 안쪽 실행 파일도 앱과 같은 팀 인증서로 다시 서명함.
+
+### 서명 키
+
+EdDSA 비밀 키는 `generate_keys --account privacy-airpods`로 만들어 이 Mac의 로그인 키체인에 있음. 공개 키는 Info.plist의 `SUPublicEDKey`임. 비밀 키를 잃으면 이미 설치된 앱이 이후 업데이트를 검증하지 못하므로 백업이 필요함. 백업은 `.build/artifacts/sparkle/Sparkle/bin/generate_keys --account privacy-airpods -x <파일>`로 내보내 저장소 밖 안전한 곳에 두고 내보낸 파일은 지움. `sign_update`가 키에 처음 접근할 때 키체인 암호 창이 뜨며 "항상 허용"을 고르면 다음 배포부터 묻지 않음.
+
+### 배포 절차
+
+1. `Resources/Info.plist`의 `CFBundleShortVersionString`과 `CFBundleVersion`을 올림. Sparkle은 `CFBundleVersion`(빌드 번호)로 새 판본을 판정함.
+2. `./scripts/package-dmg.sh`로 공증 DMG를 만듦.
+3. `scripts/publish-update.py <DMG>`를 실행함. 필수로 만들려면 `--required-below <빌드>`를 붙임. 예: 빌드 4를 내며 `--required-below 4`면 빌드 3 이하가 막힘. 기존 항목의 필수 기준이 더 높으면 그 기준을 이어 붙임. Sparkle은 가장 새 항목의 표시만 보므로 이어 붙이지 않으면 오래된 앱이 풀림.
+4. 바뀐 `appcast.xml`을 커밋하고 main에 push함. raw URL 캐시 때문에 앱이 보기까지 몇 분 걸릴 수 있음.
+
+로컬 시험은 `--local-base-url http://127.0.0.1:<포트>/ --appcast <폴더>/appcast.xml`로 GitHub 없이 appcast만 만들고, 그 폴더를 `python3 -m http.server`로 띄움. 시험 앱은 번들 ID와 `SUFeedURL`을 바꿔 다시 서명한 사본을 씀.
+
+### 검증
+
+- `swift test` 종료 0. XCTest 6개, Swift Testing 43개 통과. 새 e2e `RequiredUpdateFlowTests`는 가짜 설치 번들(빌드 3)과 127.0.0.1의 appcast로 실제 Sparkle을 돌려 네 경우를 확인함: 빌드 4 미만 필수면 차단, 빌드 3 미만 필수면 제안만 받고 차단 없음, 최신이면 제안 없음, 서버 연결 거부면 차단 없음. 업데이트 버튼이 같은 updater의 사용자 확인을 여는지도 확인함. 결함 3종(critical 무시, 실행 시 확인 제거, 버튼 미연결)을 넣으면 각각 실패함.
+- 파일 URL appcast는 Sparkle이 거부함("download request URL must use http or https"). 그래서 시험 서버를 `Network`의 로컬 listener로 둠.
+- `./scripts/build-app.sh`(개발 인증서)와 Developer ID release 조립 모두 `codesign --verify --strict --deep` 통과. framework 안 Autoupdate가 `Developer ID Application: Eunjong Kim (K8QJH6APX6)`, runtime 플래그, 보안 타임스탬프를 가짐. release `--smoke-test` OK. Blur Lab 빌드 종료 0, 진단 10/10 ok(전부 캐시, 이번 변경과 무관한 오프라인 계약).
+- 로컬 실물 흐름: Developer ID로 다시 서명한 시험 번들(`io.enjoy301.PrivacyAirPods.e2e`) 0.1.2(빌드 3)를 실행하고, `publish-update.py --local-base-url`로 만든 0.1.3(빌드 4, 빌드 4 미만 필수) appcast를 `python3 -m http.server`로 제공함.
+  - 실행 직후 appcast를 받고 Sparkle의 중요 업데이트 창이 뜸. 설정 창은 모든 조작이 disabled이고 "필수 업데이트 0.1.3" 안내가 덮음.
+  - 업데이트 설치 → DMG 내려받기, EdDSA 확인 뒤 "설치 준비 완료" → 설치 후 재실행. 같은 경로의 앱이 0.1.3(빌드 4)으로 바뀌고 서명 검사 통과, 재실행한 앱의 설정 창은 막히지 않음. 마지막 "설치 후 재실행" 클릭은 자동 조작이 오류를 반환한 뒤 설치가 진행되어 누가 눌렀는지는 확정하지 못함.
+  - Sparkle 창을 닫은 뒤에도 설정 창은 막힌 채이고 안내의 업데이트 버튼이 Sparkle 창을 다시 엶. `CFBundleDevelopmentRegion` 추가 뒤 Sparkle 창이 한국어로 표시됨.
+  - 서버를 끈 채 구판본을 실행하면 설정 창이 막히지 않음.
+- `publish-update.py`의 거부 경로: 같은 빌드 재게시, 이번 빌드보다 높은 필수 기준, 판본과 다른 DMG 이름에서 appcast를 바꾸지 않고 종료 1.
+- 시험 뒤 시험 번들의 사용자 기본값과 캐시를 지웠음. 시험 폴더는 scratchpad에만 있음.
+
+### 남은 위험
+
+- 배치 시트가 열린 상태에서 필수 판정이 들어오면 시트를 닫는 동작은 화면으로 확인하지 않았음. 실행 중 판정은 하루 주기 확인이나 메뉴의 업데이트 확인에서만 생김.
+- 메뉴 막대의 보호 켜기와 끄기가 차단 중에도 동작하는 것은 메뉴가 차단 modifier를 쓰지 않는 코드 구조로만 확인했으며, 차단 상태에서 실제 AirPods 보호는 실행하지 않았음.
+- 실제 GitHub Release와 raw appcast, 공증된 판본 사이의 업데이트는 아직 실행하지 않았음. 0.1.1 이하는 업데이트 기능이 없어 첫 판본은 직접 설치해야 함.
+- EdDSA 비밀 키는 이 Mac 키체인에만 있음. 백업 전에는 이 Mac을 잃으면 이후 업데이트를 낼 수 없음.

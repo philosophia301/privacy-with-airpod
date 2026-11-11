@@ -8,16 +8,18 @@ AirPods 착용 중 고개를 돌리거나 자리를 벗어나면 Mac 화면을 �
 
 | 경로 | 소유 내용 |
 | --- | --- |
-| `Package.swift` | Swift target·의존성·지원 OS |
+| `Package.swift` | Swift target·의존성(Sparkle 판본 고정)·지원 OS |
 | `Sources/PrivacyCore/` | 각도와 블러 분포·순수 계측 계산. OS UI 의존 금지 |
-| `Sources/PrivacyAirPods/` | 앱 조립·메뉴/설정·센서·화면 어댑터. `AppModel`은 보정·배치·보호·입력 중단 정책을 소유하고 `HeadMotionSource`·`FrameClock`·화면 목록·알림 경계를 주입받음. sample마다 바뀌는 표시값은 `LiveReadout`이 소유함. `RenderSettings`는 화면 위치별 블러 규칙, `ScreenCover`와 `SpaceTransitionBackdrop`은 실제 보호의 독립 공간 가변 블러·정확한 마스크 캐시·창 수명, `PreviewRenderer`는 설정 미리보기 비동기 수명 소유. `DisplayLayout`은 연결 화면 조회와 물리 초기 배치 변환, `SpatialScene`은 3D 표시·모니터 클릭 선택, `LaunchOptions`는 실행 인자, `ProtectionSmokeTest`는 배포 산출물 확인을 소유함 |
+| `Sources/PrivacyAirPods/` | 앱 조립·메뉴/설정·센서·화면 어댑터. `AppModel`은 보정·배치·보호·입력 중단 정책을 소유하고 `HeadMotionSource`·`FrameClock`·화면 목록·알림 경계를 주입받음. sample마다 바뀌는 표시값은 `LiveReadout`이 소유함. `RenderSettings`는 화면 위치별 블러 규칙, `ScreenCover`와 `SpaceTransitionBackdrop`은 실제 보호의 독립 공간 가변 블러·정확한 마스크 캐시·창 수명, `PreviewRenderer`는 설정 미리보기 비동기 수명 소유. `DisplayLayout`은 연결 화면 조회와 물리 초기 배치 변환, `SpatialScene`은 3D 표시·모니터 클릭 선택, `LaunchOptions`는 실행 인자, `ProtectionSmokeTest`는 배포 산출물 확인을 소유함. `UpdateState`는 필수 업데이트 판정과 설정 창 차단, `SparkleUpdater`는 Sparkle 연결을 소유함 |
 | `Sources/PrivacyBackdrop/` | 본체와 Lab이 공유하는 Objective-C backdrop/독립 합성 공간 어댑터. 비공개 API 경계·오류·소유 공간 정리 |
-| `Tests/PrivacyAppTests/` | 실제 Core Image 렌더링·앱 어댑터 검증. `ProtectionFlowTests`는 실제 가림 창 마스크를 관측하는 사용자 흐름 e2e, `Support/ProtectionHarness.swift`는 AirPods·시계·알림 대역을 소유함 |
+| `Tests/PrivacyAppTests/` | 실제 Core Image 렌더링·앱 어댑터 검증. `ProtectionFlowTests`는 실제 가림 창 마스크를 관측하는 사용자 흐름 e2e, `Support/ProtectionHarness.swift`는 AirPods·시계·알림 대역을 소유함. `RequiredUpdateFlowTests`는 실제 Sparkle이 appcast를 판정해 차단 상태에 이르는 e2e, `Support/LocalFeedServer.swift`는 배포 서버 대역을 소유함 |
 | `Tests/PrivacyCoreTests/` | 각도 경계·독립 입력으로 검증하는 계측 테스트 |
 | `scripts/diagnostics/` | `GridMetrics.swift`는 전체 프레임의 수치 격자 추출, `audit-grid.py`는 기준 대비 공간 품질 분석, `verify-diagnostics.py`는 독립 검사 병렬 실행·내용 기반 캐시를 소유함. `metric-log.py`는 일반/압축 수치 로그 읽기, `fixtures/transition/`은 과거 실패·불충분의 재현 입력을 소유함. `audit-transition.py`는 기존 노출 분류를 재사용해 제스처 유효성·관측 공백·장면 재등장 신호를 종합함. 합성 예제 기반의 격리 화면 실험과 별도 Blur Lab 빌드·수동/AirPods 비교. 제품 설정과 분리하며 화면 내용은 저장하지 않음. `BackdropSPI`는 공통 PrivacyBackdrop 어댑터 위에 비교용 속성·계측만 추가함 |
-| `scripts/build-app.sh` | 개발 실행·배포 후보 앱 번들의 유일한 조립 경로. 서명과 SDK 기록 검사 |
+| `scripts/build-app.sh` | 개발 실행·배포 후보 앱 번들의 유일한 조립 경로. Sparkle framework 포함, 서명과 SDK 기록 검사 |
 | `scripts/package-dmg.sh` | 직접 배포 DMG의 Developer ID 서명·보호 smoke test·공증·ticket 첨부·Gatekeeper 확인 |
-| `Resources/Info.plist` | 앱 메타데이터·권한 용도 설명 |
+| `scripts/publish-update.py` | 공증 DMG의 EdDSA 서명·GitHub Release 생성·appcast 항목 추가. 커밋은 하지 않음 |
+| `appcast.xml` | 앱이 읽는 업데이트 판본 목록과 필수 기준 |
+| `Resources/Info.plist` | 앱 메타데이터·권한 용도 설명·업데이트 주소와 공개 키 |
 | `docs/development.md` | 실행·복구·실물 실험 방법 |
 | `docs/blur-research.md` | 예쁜 가변 블러·전환 강건성 후보의 조사 근거와 검증 설계 |
 | `docs/performance.md` | 성능 조사 조건·비교 결과·다음 최적화 우선순위 |
@@ -44,7 +46,7 @@ AirPods 착용 중 고개를 돌리거나 자리를 벗어나면 Mac 화면을 �
 
 ## 현재 검증
 
-`swift test`는 각도·계측 계약, Core Image 렌더링, 실제 가림 창을 쓰는 보호 흐름 e2e를 검사함. 주 화면에 가림 창이 잠깐 뜨므로 연결된 화면이 필요함. `./scripts/build-app.sh`는 로컬 실행 앱을 조립·서명함. `./scripts/package-dmg.sh`는 배포 DMG를 만들며 공증 준비가 필요함. 실행 결과와 실물 검증 경계는 [개발 안내](docs/development.md)에 기록함. 테스트 통과는 실제 AirPods·다중 화면 보호의 증명이 아님.
+`swift test`는 각도·계측 계약, Core Image 렌더링, 실제 가림 창을 쓰는 보호 흐름 e2e, 실제 Sparkle의 필수 업데이트 판정 e2e를 검사함. 주 화면에 가림 창이 잠깐 뜨므로 연결된 화면이 필요함. `./scripts/build-app.sh`는 로컬 실행 앱을 조립·서명함. `./scripts/package-dmg.sh`는 배포 DMG를 만들며 공증 준비가 필요함. 실행 결과와 실물 검증 경계는 [개발 안내](docs/development.md)에 기록함. 테스트 통과는 실제 AirPods·다중 화면 보호의 증명이 아님.
 
 수치 진단 회귀는 `python3 scripts/diagnostics/verify-diagnostics.py --jobs 4 --replay-manifest scripts/diagnostics/fixtures/transition/replay-manifest.json`으로 병렬 실행함. `--fresh`는 캐시를 재사용하지 않음. 캐시 재사용은 오프라인 계약에 한하며 실물 전환 통과가 아님.
 
