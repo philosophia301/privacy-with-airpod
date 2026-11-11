@@ -1,0 +1,50 @@
+[
+  {
+    "id": "fail38-regression",
+    "kind": "transition",
+    "baseline": "pattern32-transition-off.log.gz",
+    "gesture": "gesture38-fixedangle-events.log.gz",
+    "observation": "pattern38-transition-fixedangle.log.gz",
+    "protected_bins": "0,1,2,3",
+    "expected_verdict": "regression_detected",
+    "expected_fields": {
+      "exposure_frames": 23
+    }
+  },
+  {
+    "id": "fail39-regression",
+    "kind": "transition",
+    "baseline": "pattern32-transition-off.log.gz",
+    "gesture": "gesture39-overscan-events.log.gz",
+    "observation": "pattern39-transition-overscan.log.gz",
+    "protected_bins": "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15",
+    "expected_verdict": "regression_detected",
+    "expected_fields": {
+      "exposure_frames": 273
+    }
+  },
+  {
+    "id": "fast57-inconclusive",
+    "kind": "transition",
+    "baseline": "pattern32-transition-off.log.gz",
+    "gesture": "fast57-gesture-fixedangle-events.log.gz",
+    "observation": "fast57-probe-fixedangle.log.gz",
+    "protected_bins": "0,1,2,3",
+    "expected_verdict": "inconclusive",
+    "expected_fields": {
+      "exposure_frames": 0
+    }
+  },
+  {
+    "id": "invalid-inconclusive",
+    "kind": "transition",
+    "baseline": "pattern32-transition-off.log.gz",
+    "gesture": "perf-transition-gesture-fixedangle-events.log.gz",
+    "observation": "perf-transition-probe-fixedangle.log.gz",
+    "protected_bins": "0,1,2,3",
+    "expected_verdict": "inconclusive",
+    "expected_fields": {
+      "exposure_frames": 0
+    }
+  }
+]
