@@ -2,6 +2,19 @@ import SwiftUI
 import AppKit
 
 @main
+enum Launch {
+    static func main() {
+        guard LaunchOptions.smokeTest else {
+            PrivacyAirPodsApp.main()
+            return
+        }
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        Task { @MainActor in exit(await ProtectionSmokeTest.run() ? 0 : 1) }
+        app.run()
+    }
+}
+
 struct PrivacyAirPodsApp: App {
     @StateObject private var model = AppModel()
 
@@ -44,15 +57,29 @@ private struct MenuContent: View {
     }
 }
 
-private struct WindowLevel: NSViewRepresentable {
+/// 보호 중에도 설정 창을 가림 위에 두어 보호 끄기와 재보정을 조작할 수 있게 함.
+struct WindowLevel: NSViewRepresentable {
     var aboveCover: Bool
-    func makeNSView(context: Context) -> NSView { NSView() }
-    func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async {
-            nsView.window?.hidesOnDeactivate = false
-            nsView.window?.level = aboveCover
-                ? NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.mainMenuWindow)) + 2)
-                : .normal
+    func makeNSView(context: Context) -> LevelView { LevelView() }
+    func updateNSView(_ view: LevelView, context: Context) {
+        view.aboveCover = aboveCover
+        view.apply()
+    }
+
+    final class LevelView: NSView {
+        var aboveCover = false
+
+        // 첫 갱신 때는 아직 창이 없을 수 있으므로 창에 붙는 시점에도 적용함.
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            apply()
+        }
+
+        func apply() {
+            guard let window else { return }
+            let level = aboveCover ? WindowLevels.settingsAboveCover : .normal
+            window.hidesOnDeactivate = false
+            if window.level != level { window.level = level }
         }
     }
 }
@@ -104,7 +131,7 @@ private struct PreviewWindowLifecycle: NSViewRepresentable {
                 model.setPreviewWindowVisible(false)
                 return
             }
-            if CommandLine.arguments.contains("--built-in-only"),
+            if LaunchOptions.builtInOnly,
                let screen = NSScreen.screens.first(where: { CGDisplayIsBuiltin($0.displayID) != 0 }) {
                 let area = screen.visibleFrame
                 let size = window.frame.size

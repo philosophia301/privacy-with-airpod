@@ -25,10 +25,6 @@ final class LatestRenderWork<Value: Sendable>: @unchecked Sendable {
         }
     }
 
-    func discardPending() {
-        lock.withLock { pending = nil }
-    }
-
     func close() {
         lock.withLock { closed = true; pending = nil }
     }

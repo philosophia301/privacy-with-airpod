@@ -4,16 +4,14 @@ import PrivacyBackdrop
 /// 본체와 Lab의 동일한 색조 없는 backdrop 필터를 사용함.
 @MainActor
 final class SpaceTransitionBackdrop: NSView {
-    private var backdrop: CALayer!
-    private var lastMask: Data?
-    private var lastSettings: RenderSettings?
-    private(set) var maskImage: CGImage?
+    private let backdrop: CALayer
+    private var lastMask: Data
+    private var lastSettings: RenderSettings
+    private(set) var maskImage: CGImage
     private(set) var submissionCount = 0
     private(set) var emergencyCovered = false
 
     init(frame: CGRect, settings: RenderSettings) throws {
-        super.init(frame: frame)
-        wantsLayer = true
         let data = try Self.maskData(settings)
         let image = try Self.image(data)
         var failure: NSError?
@@ -21,9 +19,11 @@ final class SpaceTransitionBackdrop: NSView {
             throw failure ?? OutputError.unavailable
         }
         backdrop = surface
+        lastMask = data; maskImage = image; lastSettings = settings
+        super.init(frame: frame)
+        wantsLayer = true
         surface.frame = bounds
         layer?.addSublayer(surface)
-        lastMask = data; maskImage = image; lastSettings = settings
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
@@ -31,11 +31,11 @@ final class SpaceTransitionBackdrop: NSView {
     func update(_ settings: RenderSettings) throws {
         guard !emergencyCovered, settings != lastSettings else { return }
         let data = try Self.maskData(settings)
-        if data == lastMask, settings.radius == lastSettings?.radius {
+        if data == lastMask, settings.radius == lastSettings.radius {
             lastSettings = settings
             return
         }
-        let image = data == lastMask ? maskImage! : try Self.image(data)
+        let image = data == lastMask ? maskImage : try Self.image(data)
         var failure: NSError?
         guard PBUpdateMask(backdrop, image, settings.radius, &failure) else {
             throw failure ?? OutputError.unavailable

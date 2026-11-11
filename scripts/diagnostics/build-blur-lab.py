@@ -5,12 +5,14 @@ import shutil
 import subprocess
 from pathlib import Path
 
+# 진단 링크는 native 빌드의 object 배치(PrivacyCore.build/*.o, PrivacyBackdrop.build)에 의존함. 기본 swiftbuild에는 이 산출물이 없음.
+SWIFT_BUILD = ['swift', 'build', '--build-system', 'native']
 root = Path(__file__).resolve().parents[2]
 out = root / '.build' / 'blur-lab'
 out.mkdir(parents=True, exist_ok=True)
-subprocess.run(['swift', 'build', '--target', 'PrivacyCore'], cwd=root, check=True)
-subprocess.run(['swift', 'build', '--target', 'PrivacyBackdrop'], cwd=root, check=True)
-bin_path = Path(subprocess.check_output(['swift', 'build', '--show-bin-path'], cwd=root, text=True).strip())
+subprocess.run([*SWIFT_BUILD, '--target', 'PrivacyCore'], cwd=root, check=True)
+subprocess.run([*SWIFT_BUILD, '--target', 'PrivacyBackdrop'], cwd=root, check=True)
+bin_path = Path(subprocess.check_output([*SWIFT_BUILD, '--show-bin-path'], cwd=root, text=True).strip())
 backdrop_build = bin_path / 'PrivacyBackdrop.build'
 backdrop_object = backdrop_build / 'PrivacyBackdrop.m.o'
 backdrop_modulemap = backdrop_build / 'module.modulemap'
@@ -22,8 +24,9 @@ subprocess.run([
     f'-fmodule-map-file={backdrop_modulemap}', '-I', str(root / 'Sources/PrivacyBackdrop/include'),
     '-c', str(root / 'scripts/diagnostics/BackdropSPI.m'), '-o', str(objc)
 ], check=True)
-objects = list((bin_path / 'PrivacyCore.build').glob('*.o'))
-if not objects:
+# 삭제된 소스의 오래된 object가 링크되지 않도록 현재 소스에 대응하는 object만 사용함.
+objects = [bin_path / 'PrivacyCore.build' / f'{p.name}.o' for p in (root / 'Sources/PrivacyCore').glob('*.swift')]
+if not objects or not all(p.exists() for p in objects):
     raise SystemExit('Build PrivacyCore with swift build first')
 sources = [p for p in (root / 'Sources/PrivacyAirPods').glob('*.swift') if p.name != 'PrivacyAirPodsApp.swift']
 binary = out / 'PrivacyBlurLab'

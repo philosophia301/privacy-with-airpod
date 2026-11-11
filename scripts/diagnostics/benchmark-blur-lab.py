@@ -5,6 +5,8 @@ import plistlib
 import subprocess
 from pathlib import Path
 
+# 진단 링크는 native 빌드의 object 배치(PrivacyCore.build/*.o, PrivacyBackdrop.build)에 의존함. 기본 swiftbuild에는 이 산출물이 없음.
+SWIFT_BUILD = ['swift', 'build', '--build-system', 'native']
 ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--lab-source', type=Path, required=True)
@@ -113,9 +115,9 @@ lab_path, cover_path = args.output/'BlurLab.swift', args.output/'PrivateCover.sw
 lab_path.write_text(lab)
 cover_path.write_text(cover)
 objc = args.output/'BackdropSPI.o'
-subprocess.run(['swift', 'build', '--target', 'PrivacyCore'], cwd=ROOT, check=True)
-subprocess.run(['swift', 'build', '--target', 'PrivacyBackdrop'], cwd=ROOT, check=True)
-bin_path = Path(subprocess.check_output(['swift', 'build', '--show-bin-path'], cwd=ROOT, text=True).strip())
+subprocess.run([*SWIFT_BUILD, '--target', 'PrivacyCore'], cwd=ROOT, check=True)
+subprocess.run([*SWIFT_BUILD, '--target', 'PrivacyBackdrop'], cwd=ROOT, check=True)
+bin_path = Path(subprocess.check_output([*SWIFT_BUILD, '--show-bin-path'], cwd=ROOT, text=True).strip())
 backdrop_build = bin_path/'PrivacyBackdrop.build'
 backdrop_object = backdrop_build/'PrivacyBackdrop.m.o'
 backdrop_modulemap = backdrop_build/'module.modulemap'
@@ -123,8 +125,9 @@ if not backdrop_object.exists() or not backdrop_modulemap.exists():
     raise SystemExit('Build PrivacyBackdrop with swift build first')
 subprocess.run(['clang', '-fobjc-arc', '-fmodules', f'-fmodule-map-file={backdrop_modulemap}',
     '-I', str(ROOT/'Sources/PrivacyBackdrop/include'), '-c', str(ROOT/'scripts/diagnostics/BackdropSPI.m'), '-o', str(objc)], check=True)
-objects = list((bin_path/'PrivacyCore.build').glob('*.o'))
-assert objects, 'build PrivacyCore first'
+# 삭제된 소스의 오래된 object가 링크되지 않도록 현재 소스에 대응하는 object만 사용함.
+objects = [bin_path/'PrivacyCore.build'/f'{p.name}.o' for p in (ROOT/'Sources/PrivacyCore').glob('*.swift')]
+assert objects and all(p.exists() for p in objects), 'build PrivacyCore first'
 sources = [p for p in (ROOT/'Sources/PrivacyAirPods').glob('*.swift') if p.name != 'PrivacyAirPodsApp.swift']
 app = args.output/'Privacy Blur Benchmark.app'
 binary = app/'Contents/MacOS/PrivacyBlurBenchmark'

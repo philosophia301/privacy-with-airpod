@@ -164,7 +164,7 @@ final class MeasureOutput:NSObject,SCStreamOutput,@unchecked Sendable {
   print("POLICY", NSApp.activationPolicy().rawValue)
   let targetScreens = firstDisplayOnly || builtInOnly ? [screen] : NSScreen.screens
   print("DISPLAY", screen.displayID, screen.frame, screen.backingScaleFactor)
-  let settings=Dictionary(uniqueKeysWithValues:targetScreens.map{($0.displayID,RenderSettings(radius:(mode=="weakoverscan" || mode=="weaktiled") ? 3 : 31.25,forceCovered:true))})
+  let settings=Dictionary(uniqueKeysWithValues:targetScreens.map{($0.displayID,RenderSettings.covered(radius:(mode=="weakoverscan" || mode=="weaktiled") ? 3 : 31.25))})
   PBSetDiagnosticBackdropFlags(mode=="clipoverscan" ? 8 : mode=="prepared" || mode=="preparedtiles" || mode=="preparedmesh" ? 3 : mode=="preallocatedtiles" ? 2 : mode=="unclippedtiles" || mode=="broadunclippedtiles" ? 1 : 0)
   if mode != "off" && mode != "labobserver" {
    do {
@@ -186,7 +186,7 @@ final class MeasureOutput:NSObject,SCStreamOutput,@unchecked Sendable {
     let count = mode == "continuous" ? 1600 : 16
     for index in 0..<count {
      let angle = mode == "dynamic" ? (index % 2 == 0 ? 45.0 : -45.0) : 45 + (mode == "continuous" ? sin(Double(index) / 20) : 0)
-     try privateCover.update(settings:[screen.displayID:RenderSettings(angle:angle,start:35,full:55,radius:20)])
+     try privateCover.update(settings:[screen.displayID:RenderSettings.hinge(angle:angle,start:35,full:55,radius:20)])
      if mode == "dynamic" { print("TARGET",mach_absolute_time(),angle) }
      try await Task.sleep(for:.milliseconds(mode == "continuous" ? 8 : 1000))
     }

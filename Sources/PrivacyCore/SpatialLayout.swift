@@ -74,8 +74,32 @@ public struct CompiledDisplayAngles: Sendable, Equatable {
         let distance = abs(BlurProfile.relativeDegrees(current: angle, reference: gaze))
         guard distance.isFinite else { return 1 }
         if transition == 0 { return distance > start ? 1 : 0 }
-
-        let progress = min(1, max(0, (distance - start) / transition))
-        return progress * progress * (3 - 2 * progress)
+        return smoothstep((distance - start) / transition)
     }
+}
+
+/// 여러 화면의 각도표와 전체 시야 폭. 실제 보호와 3D 미리보기가 같은 전환 폭을 쓰도록 한 곳에서 계산함.
+public struct CompiledLayout: Sendable, Equatable {
+    public let displays: [UInt32: CompiledDisplayAngles]
+    /// 모든 화면을 합친 좌우 시야 폭(도)임. 전환 폭 비율의 기준임.
+    public let span: Double
+
+    /// 일부만 유효해도 그 화면들로 시야를 구성함. 설정 중인 초안 미리보기용임.
+    public init(tables: [CompiledDisplayAngles]) {
+        displays = Dictionary(tables.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let minimum = tables.map(\.minimumAngle).min() ?? 0
+        let maximum = tables.map(\.maximumAngle).max() ?? 0
+        span = maximum - minimum
+    }
+
+    /// 모든 자세가 유효하고 ID가 겹치지 않을 때만 적용 가능한 배치를 만듦.
+    public init?(poses: [DisplayPose]) {
+        guard !poses.isEmpty, Set(poses.map(\.id)).count == poses.count else { return nil }
+        let tables = poses.compactMap { $0.compiled() }
+        guard tables.count == poses.count else { return nil }
+        self.init(tables: tables)
+    }
+
+    /// 전환 폭 비율(0~1)을 시야 각도로 바꿈.
+    public func transitionDegrees(fraction: Double) -> Double { span * fraction }
 }

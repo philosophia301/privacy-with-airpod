@@ -1,27 +1,5 @@
 import CoreImage
 import CoreGraphics
-import PrivacyCore
-
-struct RenderSettings: Sendable, Equatable {
-    var angle: Double = 0
-    var start: Double = 15
-    var full: Double = 55
-    var radius: Double = 45
-    var forceCovered = false
-    var panorama: PanoramaSlice?
-    var spatial: CompiledDisplayAngles?
-    var gaze = 0.0
-    var spatialStart = 35.0
-    var spatialTransition = 20.0
-
-    func strength(at x: Double) -> Double {
-        if forceCovered { return 1 }
-        if let spatial { return spatial.strength(at: x, gaze: gaze, start: spatialStart, transition: spatialTransition) }
-        if let panorama { return panorama.strength(at: x) }
-        return BlurProfile(startDegrees: start, fullDegrees: full).strength(angle: angle, horizontalPosition: x)
-    }
-
-}
 
 /// 렌더 큐 하나에서 사용함. 가장자리 확장으로 블러 경계의 투명 여백을 막음.
 final class BlurRenderer {

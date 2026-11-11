@@ -36,8 +36,8 @@ struct SpatialSetupView: View {
                 }.pickerStyle(.segmented).frame(width: 230)
             }
             SpatialScene(poses: poses, selected: $selected, gaze: gaze, start: model.startAngle,
-                         transition: model.connectionWidth / 100, radius: model.maximumBlur,
-                         armLength: armLength, avatar: avatar.rawValue, camera: camera)
+                         transitionFraction: model.connectionWidth / 100, radius: model.maximumBlur,
+                         armLength: armLength, avatar: avatar, camera: camera)
                 .frame(height: 300).clipShape(RoundedRectangle(cornerRadius: 16))
                 .accessibilityLabel("가상 책상과 모니터 배치. 모니터를 클릭하면 해당 모니터가 선택됩니다. 보기 버튼으로 시점을 바꿉니다.")
             HStack {

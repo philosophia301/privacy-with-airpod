@@ -55,21 +55,19 @@ final class ScreenCover: NSObject {
         }
     }
 
-    @discardableResult
-    func stop() -> Task<Void, Never> {
+    func stop() {
         for panel in panels.values { panel.orderOut(nil); panel.close() }
         panels.removeAll()
         space?.close(); space = nil
         outputFailed = false
-        return Task {}
     }
 
-    func makePanel(screen: NSScreen, settings: RenderSettings = RenderSettings()) throws -> NSPanel {
+    func makePanel(screen: NSScreen, settings: RenderSettings = .covered()) throws -> NSPanel {
         let frame = screen.frame
         let panel = NSPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isReleasedWhenClosed = false
         panel.isFloatingPanel = true
-        panel.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.mainMenuWindow)) + 1)
+        panel.level = WindowLevels.cover
         panel.collectionBehavior = [.stationary, .ignoresCycle, .fullScreenNone]
         panel.animationBehavior = .none
         panel.hidesOnDeactivate = false
@@ -95,6 +93,13 @@ final class ScreenCover: NSObject {
             }
         }
     }
+}
+
+/// 가림 창과 설정 창의 상하 관계. 설정 창은 보호 중에도 가림 위에서 조작 가능해야 함.
+enum WindowLevels {
+    /// 메뉴 막대와 노치 좌우까지 덮되 펼친 메뉴(popUpMenu)보다는 낮음.
+    static let cover = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.mainMenuWindow)) + 1)
+    static let settingsAboveCover = NSWindow.Level(rawValue: cover.rawValue + 1)
 }
 
 extension NSScreen {

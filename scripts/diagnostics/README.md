@@ -12,12 +12,12 @@
 
 화면 픽셀은 메모리에서만 처리함. 로그에는 시각·색 분류 비율·인접 픽셀 대비와 시험 창 상태만 남음. 시험용 전체 화면 앱 두 개가 실제 전환 대상인지 확인해야 함. 예제가 종료된 로그나 단색만 비교한 로그로 블러 유지 성공을 판정하지 않음.
 
-컴파일은 저장소 루트에서 수행함. Python 빌더는 `PrivacyCore`와 `PrivacyBackdrop` target을 먼저 빌드하고, 공용 `PrivacyBackdrop.m.o`와 modulemap을 진단 코드에 연결함.
+컴파일은 저장소 루트에서 수행함. Python 빌더는 `PrivacyCore`와 `PrivacyBackdrop` target을 먼저 빌드하고, 공용 `PrivacyBackdrop.m.o`와 modulemap을 진단 코드에 연결함. Swift 6.4의 기본 swiftbuild는 이 object 배치를 만들지 않으므로 `--build-system native`가 필요함.
 
 ```sh
-swift build --target PrivacyCore
-swift build --target PrivacyBackdrop
-bin_path="$(swift build --show-bin-path)"
+swift build --build-system native --target PrivacyCore
+swift build --build-system native --target PrivacyBackdrop
+bin_path="$(swift build --build-system native --show-bin-path)"
 backdrop_build="$bin_path/PrivacyBackdrop.build"
 clang -fobjc-arc -fmodules -fmodule-map-file="$backdrop_build/module.modulemap" \
   -I Sources/PrivacyBackdrop/include -c scripts/diagnostics/BackdropSPI.m -o /tmp/privacy-backdrop-spi.o

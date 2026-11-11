@@ -150,7 +150,7 @@ struct ExperimentView: View {
                         ForEach(["앉은 채 정지", "제자리 자세 고침", "일어서서 정지", "일어나 걷고 정지", "의자 뒤로 밀기", "일어섰다 다시 앉기"], id: \.self) { Text($0) }
                     }
                     Button("관측 시작") { model.startProbe() }.disabled(!model.fresh || model.probing)
-                    Button("중지") { model.probing = false }.disabled(!model.probing)
+                    Button("중지") { model.stopProbe() }.disabled(!model.probing)
                 }
                 HStack(spacing: 24) {
                     Text(String(format: "시간 %.2f s", model.probe.duration))

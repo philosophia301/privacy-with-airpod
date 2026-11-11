@@ -218,7 +218,7 @@ import PrivacyCore
         if sensor.state == .on, let sample, let reference {
             degrees = -BlurProfile.relativeDegrees(current: sample.yaw, reference: reference)
         } else { degrees = angle.doubleValue }
-        return [screen.displayID: RenderSettings(angle: degrees, start: 35, full: 55, radius: radius.doubleValue)]
+        return [screen.displayID: RenderSettings.hinge(angle: degrees, start: 35, full: 55, radius: radius.doubleValue)]
     }
 
     @objc private func start() {

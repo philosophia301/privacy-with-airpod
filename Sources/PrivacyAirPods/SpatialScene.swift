@@ -30,24 +30,12 @@ struct SpatialScene: NSViewRepresentable {
     @Binding var selected: UInt32
     let gaze: Double
     let start: Double
-    let transition: Double
+    /// 전체 시야 폭에 대한 전환 폭 비율(0~1). 실제 보호와 같은 규칙으로 각도로 바꿈.
+    let transitionFraction: Double
     let radius: Double
     let armLength: Double
-    let avatar: String
+    let avatar: HumanGuide
     let camera: Int
-
-    init(poses: [DisplayPose], selected: Binding<UInt32>, gaze: Double, start: Double,
-         transition: Double, radius: Double, armLength: Double, avatar: String, camera: Int) {
-        self.poses = poses
-        self._selected = selected
-        self.gaze = gaze
-        self.start = start
-        self.transition = transition
-        self.radius = radius
-        self.armLength = armLength
-        self.avatar = avatar
-        self.camera = camera
-    }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -186,7 +174,10 @@ struct SpatialScene: NSViewRepresentable {
             if previousPersonKey != personKey {
                 previousPersonKey = personKey
                 person.childNodes.forEach { $0.removeFromParentNode() }
-                let tint: NSColor = state.avatar == "여성" ? .systemPurple : state.avatar == "남성" ? .systemTeal : .systemIndigo
+                let tint: NSColor = switch state.avatar {
+                case .female: .systemPurple
+                case .male: .systemTeal
+                }
                 let head = SCNNode(geometry: SCNSphere(radius: 8))
                 head.geometry?.firstMaterial?.diffuse.contents = NSColor(calibratedRed: 0.86, green: 0.73, blue: 0.61, alpha: 1)
                 head.name = "head"
@@ -206,13 +197,14 @@ struct SpatialScene: NSViewRepresentable {
             if state.camera == 2 {
                 camera.eulerAngles = SCNVector3(0, -state.gaze * .pi / 180, 0)
             }
-            let key = [state.gaze.rounded(), state.start, state.transition, state.radius]
+            let key = [state.gaze.rounded(), state.start, state.transitionFraction, state.radius]
             if key != previousTextureKey {
                 previousTextureKey = key
-                let tables = state.poses.compactMap { $0.compiled() }
-                let span = (tables.map(\.maximumAngle).max() ?? 0) - (tables.map(\.minimumAngle).min() ?? 0)
-                for table in tables {
-                    let setting = RenderSettings(radius: state.radius, spatial: table, gaze: key[0], spatialStart: state.start, spatialTransition: span * state.transition)
+                let layout = CompiledLayout(tables: state.poses.compactMap { $0.compiled() })
+                for table in layout.displays.values {
+                    let setting = RenderSettings.spatial(table, in: layout, gaze: key[0], start: state.start,
+                                                         transitionFraction: state.transitionFraction,
+                                                         radius: state.radius)
                     surfaces[table.id]?.geometry?.firstMaterial?.diffuse.contents = renderer.render(example, settings: setting)
                 }
                 ray.childNodes.forEach { $0.removeFromParentNode() }

@@ -12,26 +12,28 @@ swift test
 open '.build/Privacy AirPods.app'
 ```
 
-빌드 스크립트는 실행 파일과 권한 설명을 앱 번들에 넣고 고정 개발 인증서로 서명함. 기본 실행은 배포 서명·공증·릴리스가 아님. 배포 DMG는 [본인 계정 DMG 직접 배포](#본인-계정-dmg-직접-배포--2026-11-11)를 따름. 실행 중인 앱의 번들을 교체하지 않도록 먼저 앱을 종료해야 함.
+빌드 스크립트는 실행 파일과 권한 설명을 앱 번들에 넣고 고정 개발 인증서로 서명함. 기본 실행은 배포 서명·공증·릴리스가 아님. 배포는 DMG 직접 배포만 하며 [본인 계정 DMG 직접 배포](#본인-계정-dmg-직접-배포--2026-11-11)를 따름. 실행 중인 앱의 번들을 교체하지 않도록 먼저 앱을 종료해야 함.
+
+`swift test`는 주 화면 하나에 실제 가림 창을 잠깐 띄우므로 연결된 화면이 필요함. 내장 화면 여부는 무관함. 테스트 구성과 범위는 [코드 품질 정리](#코드-품질-정리--2026-11-11)를 따름.
 
 최초 개발기 설정 시 `security find-identity -v -p codesigning`에서 본인 인증서의 SHA-1을 확인하고 `CODE_SIGN_IDENTITY` 환경 변수로 전달하거나 `.build/signing-identity`에 한 줄로 저장함. 이 파일은 Git 제외 대상이며 인증서 이름/식별자만 담고 개인 키는 담지 않음. `.build`를 삭제하면 다시 설정함. 인증서 미설정 또는 ad-hoc 값 `-`는 빌드 실패로 처리함.
 
-ad-hoc 서명은 빌드 내용에 따라 권한 식별 조건이 달라질 수 있음. 고정 인증서로 전환한 첫 실행에서는 이 앱의 화면 기록 권한을 재등록해야 할 수 있음. [Apple의 서명 식별 조건 설명](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements)을 따르며 인증서 기반 기본 조건을 사용함. 식별자만으로 검사 조건을 약화하지 않음.
+ad-hoc 서명은 빌드 내용에 따라 권한 식별 조건이 달라질 수 있음. 고정 인증서로 전환한 첫 실행에서는 이 앱의 동작 권한을 다시 허용해야 할 수 있음. [Apple의 서명 식별 조건 설명](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements)을 따르며 인증서 기반 기본 조건을 사용함. 식별자만으로 검사 조건을 약화하지 않음.
 
 ## 조작과 복구
 
 ```text
-AirPods 입력 시작 → 책상 정면 보정 → 좌우 폭·간격·거리 입력 → 미리보기와 좌우 방향 확인 → 실제 화면 회전 블러 켜기 → 메뉴에서 보호 끄기
+AirPods 입력 시작 → 책상 정면 보정 → 3D 배치 맞추기와 적용 → 미리보기와 좌우 방향 확인 → 실제 화면 회전 블러 켜기 → 메뉴나 설정 창에서 보호 끄기
 ```
 
 1. 수동 미리보기는 앱이 그린 예제 화면만 바꾸며 실제 화면의 보호 입력으로 쓰이지 않음.
 2. AirPods 입력 시작은 motion 권한을 요청할 수 있음. 거절·미지원·끊김은 상태에 표시됨.
-3. 책상 정면을 보며 정면 맞추기를 한 번 누름. 좌우 화면 폭·간격을 cm로 입력하고 거리와 정면 위치를 확인함. 고개를 오른쪽으로 돌렸을 때 양수인지 확인하고 반대면 실물 확인용 좌우 반전을 사용함. 실제 방향 판정 전에는 효과의 정확성을 주장하지 않음.
-4. 실제 화면 블러는 화면 기록 권한이 필요함. 사용자는 이 용도의 메모리 처리·무저장·무전송을 허용했음. OS 권한 대화상자와 앱 재실행 요구가 있으면 따름.
-5. 화면 기록 중 자신의 앱을 캡처에서 제외함. 메뉴 막대와 설정 창이 가림 위에서 보이도록 하며 가림 창은 클릭을 가로채지 않음.
-6. 메뉴의 보호 끄기 또는 앱 종료로 가림을 해제함. 입력 소실·렌더 실패 때 이전 선명한 프레임을 지우고 불투명 가림 유지 후 끄기·재보정을 안내하는 실험용 대응임. 최종 제품 복귀 정책은 spec의 미정 상태를 따름.
+3. 책상 정면을 보며 정면 맞추기를 한 번 누름. 3D 배치는 감지한 화면 크기를 초기값으로 쓰며 위치·거리·회전을 맞춘 뒤 적용함. 고개를 오른쪽으로 돌렸을 때 양수인지 확인하고 반대면 실물 확인용 좌우 반전을 사용함. 실제 방향 판정 전에는 효과의 정확성을 주장하지 않음.
+4. 실제 화면 블러는 화면을 캡처하지 않고 WindowServer 합성 결과에 가변 블러 마스크만 적용함. 화면 기록 권한을 요청하지 않음.
+5. 가림 창은 메뉴 막대와 노치 좌우까지 덮고 클릭을 가로채지 않음. 펼친 메뉴와 보호 중인 설정 창은 가림 위에 표시됨.
+6. 메뉴나 설정 창의 보호 끄기 또는 앱 종료로 가림을 해제함. 입력 중단의 기본은 블러 해제이고, 옵션을 켜면 보호를 끌 때까지 전체 블러를 유지함. 화면 출력 실패는 검은 비상 가림을 유지하고 보호 끄기를 안내함. 최종 제품 복귀 정책은 spec의 미정 상태를 따름.
 
-화면 구성이 달라지면 이번 회전 실험을 중지하고 기준을 다시 받음. 잠자기·capture 실패·권한 변경의 실제 화면 결과, Spaces·전체 화면과 메뉴 자동 숨김 조건은 각각 확인해야 함. 미검증 조합을 보호 완료라고 안내하지 않음.
+화면 구성이 달라지면 보호를 끄고 정면 보정과 3D 배치를 다시 받음. 잠자기·출력 실패의 실제 화면 결과, Spaces·전체 화면과 메뉴 자동 숨김 조건은 각각 확인해야 함. 미검증 조합을 보호 완료라고 안내하지 않음.
 
 ## 이동량·기립 실험
 
@@ -324,7 +326,7 @@ codesign --verify --strict --verbose=2 '.build/distribution/20260914-171706/Priv
 
 ## Native 단일 출력 후보 구현·검증 — 2026-09-14
 
-사용자 승인 뒤 ScreenCover의 SCStream·GPU presenter·Space 알림 레이어 교체를 실제 보호 경로에서 제거함. 화면별 NSPanel 하나에 SpaceTransitionBackdrop 하나를 유지하고 각도 변화에는 마스크만 갱신함. 기존 캡처 출력 코드는 CapturedScreenOutput.swift로 이동하여 이전 방식 비교 진단과 회귀 검사에만 남김. 실제 보호에서 인스턴스를 생성하지 않음. 기본 입력 중단 해제/선택적 전체 블러 유지와 화면 구성 변경 시 중단은 기존 AppModel 경로를 유지함.
+사용자 승인 뒤 ScreenCover의 SCStream·GPU presenter·Space 알림 레이어 교체를 실제 보호 경로에서 제거함. 화면별 NSPanel 하나에 SpaceTransitionBackdrop 하나를 유지하고 각도 변화에는 마스크만 갱신함. 기존 캡처 출력 코드는 CapturedScreenOutput.swift로 이동하여 이전 방식 비교 진단과 회귀 검사에만 남김. 실제 보호에서 인스턴스를 생성하지 않음. 이 비교용 코드는 2026-11-11 [코드 품질 정리](#코드-품질-정리--2026-11-11)에서 삭제함. 기본 입력 중단 해제/선택적 전체 블러 유지와 화면 구성 변경 시 중단은 기존 AppModel 경로를 유지함.
 
 기본 블러의 농도와 예제 차이는 spec 소유임. 화면 기록 안내를 현재 동작에 맞추고 ‘효과 농도’로 표시함. ScreenCover 시작은 전체 화면 ID를 먼저 확인하여 일부 창만 열린 채 실패하지 않도록 함. stop은 즉시 모든 창을 닫고 이후 update로 다시 열리지 않음.
 
@@ -385,10 +387,10 @@ Privacy AirPods의 `ScreenCover`가 화면별 패널을 앱 소유 독립 합성
 
 ## 본인 계정 DMG 직접 배포 — 2026-11-11
 
-사용자가 본인 Apple Developer 계정으로 만든 DMG 배포를 먼저 진행하고 최종적으로 App Store 제출을 원함. 직접 배포는 App Store 밖에서 받은 앱이 Gatekeeper를 통과하도록 Developer ID 서명과 Apple 공증을 거치는 경로임. 공증은 Apple이 제출물을 자동 검사한 뒤 통과 기록(ticket)을 발급하는 절차임. 위의 2026-09-14 Developer ID 서명은 이전 팀 인증서의 이력이며, 이번 경로의 기본 팀은 사용자 팀 K8QJH6APX6임.
+사용자가 본인 Apple Developer 계정으로 만든 DMG 배포를 먼저 진행하고 최종적으로 App Store 제출을 원했음. 같은 날 App Store 제출을 하지 않고 DMG 직접 배포만 하기로 결정했음([spec](spec.md#배포-경로--2026-11-11-사용자-지시)). 직접 배포는 App Store 밖에서 받은 앱이 Gatekeeper를 통과하도록 Developer ID 서명과 Apple 공증을 거치는 경로임. 공증은 Apple이 제출물을 자동 검사한 뒤 통과 기록(ticket)을 발급하는 절차임. 위의 2026-09-14 Developer ID 서명은 이전 팀 인증서의 이력이며, 이번 경로의 기본 팀은 사용자 팀 K8QJH6APX6임.
 
 ```text
-build-app.sh(release, hardened runtime) → DMG 조립·서명 → notarytool 제출 → stapler 첨부 → spctl 확인
+build-app.sh(release, hardened runtime) → --smoke-test → DMG 조립·서명 → notarytool 제출 → stapler 첨부 → spctl 확인
 ```
 
 ### 한 번만 하는 준비
@@ -407,11 +409,11 @@ build-app.sh(release, hardened runtime) → DMG 조립·서명 → notarytool �
 ./scripts/package-dmg.sh --no-notarize  # 공증 없이 서명과 DMG 조립만 확인
 ```
 
-결과는 `.build/distribution/<시각>/Privacy-AirPods-<버전>.dmg`임. 공증 상태가 Accepted가 아니면 같은 폴더에 `notary-result.json`과 `notary-log.json`을 남기고 실패함. 배포할 때마다 Info.plist의 `CFBundleShortVersionString`(사용자에게 보이는 버전)과 `CFBundleVersion`(빌드 번호)을 올림. DMG에만 ticket을 첨부하며 앱 단독 첨부는 하지 않음. 공증 log의 ticket 내용에 DMG 안의 앱과 실행 파일이 포함됨을 확인했음.
+결과는 `.build/distribution/<시각>/Privacy-AirPods-<버전>.dmg`임. 공증 전에 서명된 실행 파일을 `--smoke-test`로 실행해 주 화면에 실제 가림 창을 열고, 마스크를 갱신하고, 닫는지 확인함. 실패하면 `smoke-test.log`를 남기고 중단함. 이때 주 화면이 잠깐 흐려짐. 공증 상태가 Accepted가 아니면 같은 폴더에 `notary-result.json`과 `notary-log.json`을 남기고 실패함. 배포할 때마다 Info.plist의 `CFBundleShortVersionString`(사용자에게 보이는 버전)과 `CFBundleVersion`(빌드 번호)을 올림. DMG에만 ticket을 첨부하며 앱 단독 첨부는 하지 않음. 공증 log의 ticket 내용에 DMG 안의 앱과 실행 파일이 포함됨을 확인했음.
 
 ### 변경과 이유
 
-- 앱 ID를 `local.privacy-with-airpod.app`에서 `io.enjoy301.PrivacyAirPods`로 바꾸고 버전 0.1.0을 추가함. 앱 ID는 사용자의 기존 iOS 앱 접두사를 따랐으며 2026-11-11 사용자가 확정했음. 앱 ID가 바뀌어 동작·화면 기록 권한을 한 번 다시 허용해야 함.
+- 앱 ID를 `local.privacy-with-airpod.app`에서 `io.enjoy301.PrivacyAirPods`로 바꾸고 버전 0.1.0을 추가함. 앱 ID는 사용자의 기존 iOS 앱 접두사를 따랐으며 2026-11-11 사용자가 확정했음. 앱 ID가 바뀌어 동작 권한을 한 번 다시 허용해야 함.
 - Swift 6.4의 기본 build system(swiftbuild)은 실행 파일의 SDK 기록을 최소 OS인 15.0으로 남겼음. 같은 소스를 native로 빌드하면 27.0이 기록됨. 시스템 framework는 이 기록으로 구 SDK 호환 동작을 고를 수 있으므로 build-app.sh는 native를 사용하고 기록이 현재 SDK와 다르면 실패함. native는 deprecated 경고를 출력하며, 제거되어 swiftbuild로 돌아가면 이 검사가 실패로 알림.
 - 배포 후보는 개발 번들과 같은 build-app.sh 조립 경로를 사용하고 release 구성에서만 hardened runtime과 보안 타임스탬프를 붙임. 추가 entitlement는 없음.
 - DMG는 macOS 27에서 deprecated된 `hdiutil create` 대신 `diskutil image create from`으로 만듦. 이 명령이 없는 이전 macOS에서는 스크립트가 실패함.
@@ -424,7 +426,58 @@ build-app.sh(release, hardened runtime) → DMG 조립·서명 → notarytool �
 - 인증서 없음, 공증 프로필 없음, 잘못된 인자의 실패 메시지를 확인함.
 - 사용자 Developer ID(`K8QJH6APX6`, 2027-12-11 만료)로 전체 실행 종료 0. 제출 `2d5cdd93-e598-4225-9447-16aeeda3df39`는 Accepted, issues 없음. `stapler validate` 통과, DMG와 앱 모두 `spctl` accepted `source=Notarized Developer ID`. 산출물은 `.build/distribution/20261111-184704/Privacy-AirPods-0.1.0.dmg`임.
 - DMG 사본에 quarantine 속성을 붙여 내려받은 파일을 모사했을 때 DMG와 마운트한 앱 모두 accepted였음. 실제 다운로드 경로와 다른 Mac의 첫 실행은 미확인임. arm64 전용 빌드이며 Intel Mac은 대상이 아님.
+- 품질 정리 뒤 사용자 Developer ID로 `--no-notarize` 실행 종료 0. hardened runtime release 실행 파일의 `--smoke-test`가 `smoke-test OK`로 끝나 비공개 backdrop과 소유 Space의 가림 시작, 마스크 갱신, 종료가 이 Mac에서 동작함을 확인함. AirPods 입력과 다른 Mac, 공증된 새 판본은 미확인임.
 
-### App Store 경로의 차단 요인
+### App Store 경로를 제외한 근거
 
-실제 보호가 비공개 backdrop과 CGS Space 함수에 의존하므로 [배포 경계 조사](blur-research.md#시스템-합성-후보와-배포-경계)의 App Review 2.5.1 조건상 현재 판본은 제출 대상이 아님. 제출하려면 실제 보호 출력을 공개 API 경로로 바꿀지 사용자 결정이 먼저 필요함. 그 뒤에도 App Sandbox 적용과 실기기 재검증, Mac App Store용 인증서와 provisioning profile, 앱 아이콘, 앱 이름의 Apple 상표(AirPods) 사용 검토, Xcode 프로젝트 기반 archive·업로드 전환이 남음.
+2026-11-11 사용자가 DMG 직접 배포만 하기로 결정했으므로 아래는 다시 검토할 때의 기록임. 실제 보호가 비공개 backdrop과 CGS Space 함수에 의존하므로 [배포 경계 조사](blur-research.md#시스템-합성-후보와-배포-경계)의 App Review 2.5.1 조건상 현재 판본은 제출 대상이 아님. 제출하려면 실제 보호 출력을 공개 API 경로로 바꿀지 사용자 결정이 먼저 필요함. 그 뒤에도 App Sandbox 적용과 실기기 재검증, Mac App Store용 인증서와 provisioning profile, 앱 아이콘, 앱 이름의 Apple 상표(AirPods) 사용 검토, Xcode 프로젝트 기반 archive·업로드 전환이 남음.
+
+## 코드 품질 정리 — 2026-11-11
+
+사용자가 확장성, 테스트 품질(억지 unit보다 e2e 위주), bad smell과 회귀 점검을 요청하고 저장소 소유를 위임함. 정리 전 상태는 `.build/baselines/before-quality-20261111.tar.gz`에 보관함. Git 저장소가 아니어서 이력 비교는 이 snapshot 기준임.
+
+### 발견과 조치
+
+| 분류 | 발견 | 조치 |
+| --- | --- | --- |
+| 죽은 코드 | 실제 보호에서 쓰지 않는 캡처 출력(`CapturedScreenOutput`, `MetalPresenter`, `CaptureReadiness`)과 `PanoramaProfile`, `LatestRenderWork.discardPending`, 깨진 `benchmark-renderer` | 코드와 그 테스트를 삭제함. 쓰지 않는 Info.plist 화면 기록 설명도 삭제함 |
+| 구조 | `AppModel`이 센서, 시계, 화면 목록, 알림을 직접 만들어 흐름 검사가 불가능했고 모든 상태를 외부에서 쓸 수 있었음 | `HeadMotionSource`, `FrameClock`, 화면 목록 공급, 알림 센터를 주입받음. 흐름 상태는 `private(set)`이고 `startProtection()`, `stopProbe()` 같은 흐름 함수로만 바뀜 |
+| 중복 | smoothstep 3곳, 시야 폭과 전환 각도 계산 2곳(`AppModel`, `SpatialScene`), 화면 정렬 2곳, 창 레벨 상수 2곳, `--built-in-only` 해석 2곳 | `smoothstep`, `CompiledLayout`, `DisplayLayout.leftToRight`, `WindowLevels`, `LaunchOptions` 한 곳으로 모음 |
+| 타입 | `RenderSettings`가 선택 필드의 우선순위로 모드를 표현하고, 사람 모형을 문자열로 비교함 | `RenderSettings.Field` enum(`covered`, `hinge`, `spatial`)과 `HumanGuide` 타입을 사용함 |
+| 수명 | `ScreenCover.stop()`이 동기 정리 뒤 빈 `Task`를 반환함. backdrop 상태가 IUO와 강제 unwrap에 의존함 | 반환값 없는 정리로 바꾸고 저장 속성을 비옵셔널로 초기화함 |
+| 회귀 | 기본 swiftbuild에서 Blur Lab과 벤치마크 빌드가 object 경로를 찾지 못해 실패함. 링크 목록이 삭제된 소스의 오래된 object도 포함함 | 진단 빌드에 `--build-system native`를 지정하고 현재 소스에 대응하는 object만 링크함 |
+| 테스트 | 흐름 테스트가 `protected = true`처럼 불가능한 상태를 직접 주입했고 내장 화면이 없으면 실패함. 고개 회전이 실제 가림 마스크를 바꾸는 핵심 경로는 검사하지 않았음 | 아래 e2e로 교체함 |
+| 갱신 비용 | 설정 창 레벨 지정이 매 갱신마다 비동기 작업을 예약함 | 창 연결 시점과 값이 바뀔 때만 적용함 |
+
+`AppModel`의 입력 판정, 보정, 배치, 보호 정책 자체는 바꾸지 않았음. 보호 시작은 이제 `toggleProtection()`이 다음 MainActor 차례에 시작하며 사용자에게 보이는 차이는 없음.
+
+### e2e 테스트 구성
+
+`ProtectionFlowTests`는 실제 `AppModel`, `ScreenCover`, 비공개 backdrop 가림 창을 주 화면에서 실행하고 WindowServer에 제출한 마스크 알파를 관측함. 대역은 `Tests/PrivacyAppTests/Support/ProtectionHarness.swift`의 AirPods 입력, 수동 시계, 별도 알림 센터뿐임. 배치는 화면 크기와 무관하게 40cm 화면을 정면 60cm에 둔 값을 적용함.
+
+| 흐름 | 관측 |
+| --- | --- |
+| 정면 → 고개 회전 | 정면은 전체 선명, 오른쪽 45°는 왼쪽부터 가림, 왼쪽 45°는 대칭, 90°는 전체 가림. 급회전 첫 주기는 부분 가림 |
+| 늦게 도착한 과거 sample | 마스크와 보호 상태가 바뀌지 않음 |
+| 입력 중단 6종(무응답, 센서 오류, 이어버드 교체, 오래된 sample, 잠자기, 입력 중지) × 옵션 2종 | 기본은 보호 해제. 옵션을 켜면 전체 가림 유지, 재착용과 재보정 시도로 풀리지 않고 옵션을 끌 때 해제 |
+| 화면 구성 변경 | 보호 중지, 배치 폐기, 새 배치 적용 전 시작 불가 |
+| 출력 실패 | 검은 비상 가림 유지. 값 복구나 옵션 변경으로 풀리지 않고 보호 끄기로만 닫힘 |
+| 배치 적용 | 옆 화면은 정면에서 가려지고 바라보면 선명해짐. 보호 중 변경과 잘못된 배치는 거부 |
+| 시작 조건 | 입력, 정면 보정, 배치 중 하나라도 없거나 입력이 끊기면 시작 거부 |
+| 유휴 | 미리보기, 입력, 보호가 모두 없으면 주기 갱신을 멈춤 |
+
+실제 Core Image 렌더, backdrop 마스크 바이트, 렌더 작업 병합, SceneKit 선택과 시점, Core Motion 콜백 전달, PrivacyCore 각도 계약 검사는 유지함. 실제 AirPods 머리 움직임, 사람이 보는 외형, Spaces 전환, 다중 화면은 이 테스트가 증명하지 않음.
+
+### 검증
+
+- `swift test` 종료 0, 경고 없음. XCTest 6개, Swift Testing PrivacyCore 11개와 앱 29개(입력 중단 12개 사례 포함 40개 사례) 통과. 정리 전은 XCTest 6개, Swift Testing 58개였으며 줄어든 수는 삭제한 죽은 코드의 테스트와 상태 주입 테스트를 e2e로 합친 결과임.
+- 결함 주입 8종 중 7종을 e2e가 잡음: 과거 sample 수용, 좌우 방향 무시, 화면 변경 뒤 배치 유지, 보호 중 재보정 허용, 평활화 제거, 주기 갱신 상시 실행, 전체 가림 유지 옵션 무시. 남은 1종(일시 중단 상태의 가림 조건 제거)은 일시 중단마다 정면 기준이 이미 없어 결과가 같은 중복 안전장치임.
+- `swift build --build-system native`는 native deprecated 안내 외 경고 없음. `python3 scripts/diagnostics/build-blur-lab.py` 종료 0. `verify-diagnostics.py --jobs 4 --replay-manifest …` 10/10 ok.
+- 디버그 실행 파일의 `--smoke-test` 종료 0. `./scripts/build-app.sh`로 조립한 개발 앱이 880×760 설정 창을 열고 정상 종료함. Developer ID `--no-notarize` 결과는 위 DMG 검증에 기록함.
+- 제품 소스는 2243줄에서 2027줄, 테스트는 1060줄에서 958줄로 줄었음.
+
+### 남은 위험
+
+- 설정 창 전체가 sample마다 다시 그려짐(`sampleCount`, `motionStatus` 갱신). 기능 문제는 없으나 전력 측정 전이므로 바꾸지 않았음.
+- `PrivacyBackdrop.m`이 소유 Space 생성과 종료를 stdout과 NSLog에 기록함. 진단 로그 대조에 쓰이므로 유지했으나 배포 앱에서도 남음.
+- 보호 중 설정 창이 가림 위로 올라오는 동작은 창 레벨 단위 검사로만 확인했으며 실제 AirPods 보호 중 화면 확인은 하지 않았음.

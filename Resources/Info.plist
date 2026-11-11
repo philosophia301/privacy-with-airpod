@@ -9,7 +9,6 @@
 <key>CFBundleVersion</key><string>1</string>
 <key>LSMinimumSystemVersion</key><string>15.0</string>
 <key>NSMotionUsageDescription</key><string>고개 방향에 따라 화면을 흐리게 하고 자리 이탈 실험을 위해 AirPods 움직임을 사용합니다.</string>
-<key>NSScreenCaptureUsageDescription</key><string>화면을 메모리에서 블러 처리합니다. 화면 내용을 파일로 저장하거나 외부로 전송하지 않습니다.</string>
 <key>NSPrincipalClass</key><string>NSApplication</string>
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>

@@ -22,8 +22,17 @@ struct HeadSample: Sendable {
     }
 }
 
+/// AppModel이 받는 머리 동작 입력. 실제 앱은 MotionService, 테스트는 합성 입력을 씀.
 @MainActor
-final class MotionService {
+protocol HeadMotionSource: AnyObject {
+    var onSample: ((HeadSample) -> Void)? { get set }
+    var onError: ((String) -> Void)? { get set }
+    func start()
+    func stop()
+}
+
+@MainActor
+final class MotionService: HeadMotionSource {
     private let manager = CMHeadphoneMotionManager()
     private let queue: OperationQueue = {
         let queue = OperationQueue()

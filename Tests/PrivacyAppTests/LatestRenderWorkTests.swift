@@ -42,10 +42,10 @@ import CoreImage
     var received: [RenderSettings] = []
     let renderer = PreviewRenderer()
     renderer.setVisible(true)
-    renderer.request(input, settings: RenderSettings(angle: 10, radius: 20))
+    renderer.request(input, settings: RenderSettings.hinge(angle: 10, radius: 20))
     renderer.setVisible(false)
     renderer.setVisible(true)
-    let latest = RenderSettings(angle: 70, radius: 20)
+    let latest = RenderSettings.hinge(angle: 70, radius: 20)
 
     await withCheckedContinuation { continuation in
         renderer.onFrame = { frame in
@@ -57,15 +57,4 @@ import CoreImage
 
     #expect(received == [latest])
     renderer.stop()
-}
-
-@Test func spaceBoundaryDiscardsWaitingWorkWithoutClosingTheRenderer() {
-    let work = LatestRenderWork<Int>()
-    #expect(work.submit(1))
-    #expect(work.take() == 1)
-    #expect(!work.submit(2))
-    work.discardPending()
-    #expect(work.take() == nil)
-    #expect(work.submit(3))
-    #expect(work.take() == 3)
 }

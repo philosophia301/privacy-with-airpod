@@ -32,6 +32,12 @@ app="$out_dir/Privacy AirPods.app"
 dmg="$out_dir/Privacy-AirPods-$version.dmg"
 mkdir -p "$out_dir"
 BUILD_CONFIGURATION=release APP_DIR="$app" CODE_SIGN_IDENTITY="$identity" ./scripts/build-app.sh >/dev/null
+# 공증 전에 hardened runtime으로 서명된 실행 파일이 실제 가림 창을 열고 마스크를 갱신하고 닫는지 확인함.
+# 주 화면이 잠깐 흐려짐. 20초 안에 끝나지 않으면 실패로 봄.
+if ! perl -e 'alarm shift; exec @ARGV' 20 "$app/Contents/MacOS/PrivacyAirPods" --smoke-test >"$out_dir/smoke-test.log" 2>&1; then
+    printf '배포 후보의 보호 smoke test 실패. 로그: %s\n' "$out_dir/smoke-test.log" >&2
+    exit 1
+fi
 
 staging="$out_dir/dmg-root"
 mkdir -p "$staging"

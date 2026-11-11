@@ -29,7 +29,12 @@ public struct BlurProfile: Sendable, Equatable {
         let position = min(1, max(0, x))
         let distanceFromHinge = angle >= 0 ? 1 - position : position
         // 양 끝 모두 완전히 가려지되 중간 각도에서는 축에서 먼 쪽이 먼저 가려짐.
-        let local = min(1, max(0, progress * 2 - (1 - distanceFromHinge)))
-        return local * local * (3 - 2 * local)
+        return smoothstep(progress * 2 - (1 - distanceFromHinge))
     }
+}
+
+/// 0~1로 자른 진행도를 양 끝 기울기 0인 곡선으로 바꿈. 모든 블러 경계가 같은 곡선을 사용함.
+func smoothstep(_ progress: Double) -> Double {
+    let clamped = min(1, max(0, progress))
+    return clamped * clamped * (3 - 2 * clamped)
 }
