@@ -15,11 +15,13 @@ AirPods 착용 중 고개를 돌리거나 자리를 벗어나면 Mac 화면을 �
 | `Tests/PrivacyAppTests/` | 실제 Core Image 렌더링·앱 어댑터 검증. `ProtectionFlowTests`는 실제 가림 창 마스크를 관측하는 사용자 흐름 e2e, `Support/ProtectionHarness.swift`는 AirPods·시계·알림 대역을 소유함. `RequiredUpdateFlowTests`는 실제 Sparkle이 appcast를 판정해 차단 상태에 이르는 e2e, `Support/LocalFeedServer.swift`는 배포 서버 대역을 소유함 |
 | `Tests/PrivacyCoreTests/` | 각도 경계·독립 입력으로 검증하는 계측 테스트 |
 | `scripts/diagnostics/` | `GridMetrics.swift`는 전체 프레임의 수치 격자 추출, `audit-grid.py`는 기준 대비 공간 품질 분석, `verify-diagnostics.py`는 독립 검사 병렬 실행·내용 기반 캐시를 소유함. `metric-log.py`는 일반/압축 수치 로그 읽기, `fixtures/transition/`은 과거 실패·불충분의 재현 입력을 소유함. `audit-transition.py`는 기존 노출 분류를 재사용해 제스처 유효성·관측 공백·장면 재등장 신호를 종합함. 합성 예제 기반의 격리 화면 실험과 별도 Blur Lab 빌드·수동/AirPods 비교. 제품 설정과 분리하며 화면 내용은 저장하지 않음. `BackdropSPI`는 공통 PrivacyBackdrop 어댑터 위에 비교용 속성·계측만 추가함 |
-| `scripts/build-app.sh` | 개발 실행·배포 후보 앱 번들의 유일한 조립 경로. Sparkle framework 포함, 서명과 SDK 기록 검사 |
+| `scripts/build-app.sh` | 개발 실행·배포 후보 앱 번들의 유일한 조립 경로. Sparkle framework와 앱 아이콘 포함, 서명과 SDK 기록 검사 |
 | `scripts/package-dmg.sh` | 직접 배포 DMG의 Developer ID 서명·보호 smoke test·공증·ticket 첨부·Gatekeeper 확인 |
 | `scripts/publish-update.py` | 공증 DMG의 EdDSA 서명·GitHub Release 생성·appcast 항목 추가. 커밋은 하지 않음 |
+| `scripts/make-app-icon.py` | 원본 그림에서 앱 아이콘 생성. 캐릭터 오리기·가변 블러·`.icns` 변환 |
 | `appcast.xml` | 앱이 읽는 업데이트 판본 목록과 필수 기준 |
 | `Resources/Info.plist` | 앱 메타데이터·권한 용도 설명·업데이트 주소와 공개 키 |
+| `Resources/AppIcon.icns` | 앱 아이콘. `scripts/make-app-icon.py`의 산출물 |
 | `docs/development.md` | 실행·복구·실물 실험 방법 |
 | `docs/blur-research.md` | 예쁜 가변 블러·전환 강건성 후보의 조사 근거와 검증 설계 |
 | `docs/performance.md` | 성능 조사 조건·비교 결과·다음 최적화 우선순위 |
@@ -30,6 +32,7 @@ AirPods 착용 중 고개를 돌리거나 자리를 벗어나면 Mac 화면을 �
 | `docs/spec.md` | 사용자 행동·결정 후보·승인된 선택과 이유 |
 | `docs/feasibility.md` | 플랫폼 조사 근거·기술 가정·실기기 검증 계획 |
 | `docs/assets/blur-reference/` | 사용자가 제공한 블러 reference 이미지 원본. 해석과 결정은 spec 소유 |
+| `docs/assets/app-icon/` | 사용자가 제공한 앱 아이콘 원본 그림. 결정은 spec 소유 |
 | `docs/rules/` | spec 결정·작업·테스트·작성 규칙 |
 | `docs/references.md` | 이번 규칙의 출처와 차용 범위 |
 

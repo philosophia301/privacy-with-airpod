@@ -3,6 +3,7 @@
 <plist version="1.0"><dict>
 <key>CFBundleDevelopmentRegion</key><string>ko</string>
 <key>CFBundleExecutable</key><string>PrivacyAirPods</string>
+<key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundleIdentifier</key><string>io.enjoy301.PrivacyAirPods</string>
 <key>CFBundleName</key><string>Privacy AirPods</string>
 <key>CFBundlePackageType</key><string>APPL</string>

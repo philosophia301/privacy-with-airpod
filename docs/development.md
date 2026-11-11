@@ -546,3 +546,35 @@ EdDSA 비밀 키는 `generate_keys --account privacy-airpods`로 만들어 이 M
 - 메뉴 막대의 보호 켜기와 끄기가 차단 중에도 동작하는 것은 메뉴가 차단 modifier를 쓰지 않는 코드 구조로만 확인했으며, 차단 상태에서 실제 AirPods 보호는 실행하지 않았음.
 - 실제 Release 경로의 필수(critical) 차단은 로컬 서버로만 확인함. 0.1.1 이하는 업데이트 기능이 없어 0.1.2를 직접 설치해야 함.
 - EdDSA 비밀 키는 이 Mac 로그인 키체인에만 있음. 잃으면 위 키 교체 규칙으로 새 키로 넘어가야 하며, 이 경로는 Sparkle 소스로만 확인하고 실제로 시험하지 않았음.
+
+## 앱 아이콘 — 2026-11-11
+
+사용자 결정은 [spec](spec.md#앱-아이콘--2026-11-11-사용자-결정)이 소유함. 아이콘은 사용자가 준 아기상어 그림에서 캐릭터만 오려 단색 배경에 놓고, 앱의 가변 블러처럼 오른쪽으로 갈수록 흐리게 만든 것임. 캐릭터는 다시 그리지 않음.
+
+### 구성
+
+| 경로 | 역할 |
+| --- | --- |
+| `docs/assets/app-icon/baby-shark-source.png` | 사용자가 준 원본(282×222). 아이콘의 유일한 입력 |
+| `scripts/make-app-icon.py` | 캐릭터 오리기, 배경과 가변 블러, macOS 아이콘 템플릿(1024px 안의 824px 둥근 사각형과 그림자), `iconutil`로 `.icns` 만들기. 결정값(배경색, 흐림 시작과 끝, 최대 반경)은 파일 머리에 있음 |
+| `Resources/AppIcon.icns` | 16~512pt의 1x, 2x 10장. 스크립트 산출물이며 빌드는 이 파일만 씀 |
+| `Resources/Info.plist` | `CFBundleIconFile`을 `AppIcon`으로 둠 |
+| `scripts/build-app.sh` | `.icns`를 `Contents/Resources`에 복사한 뒤 서명함 |
+
+원본의 캐릭터 외곽선은 뒤의 물결, 체크무늬와 같은 갈색이라 색만으로 나눌 수 없음. 그래서 노란 면과 배의 흰 면에서 외곽선 두께(원본 기준 7px)까지만 넓히고, 이미지 가장자리와 이어진 바깥과 물결 안쪽 색은 뺌. 이 임계값은 이 원본에 맞춘 값이라 그림을 바꾸면 결과를 보고 다시 맞춰야 함. 생성형 업스케일러(SeedVR2)는 홍채와 볼 띠에 원본에 없는 얼룩 질감을 더해서 쓰지 않고 Lanczos 확대와 약한 선명화만 씀.
+
+### 다시 만들기
+
+`scripts/make-app-icon.py`를 실행하면 `Resources/AppIcon.icns`를 덮어씀. `--png <경로>`를 붙이면 1024px 원본도 저장함. Pillow와 numpy가 필요함. 같은 입력이면 같은 파일이 나옴.
+
+### 검증
+
+- 두 번 생성한 `.icns`의 SHA-256이 같음(`09c1a6df…`). 캔버스 시안을 만든 경로와의 픽셀 차이는 최대 2/255임.
+- `iconutil --convert iconset`으로 되풀어 16~512pt 1x, 2x 10장을 확인함.
+- `APP_DIR`을 scratchpad로 둔 `./scripts/build-app.sh`(개발 인증서) 조립에서 `Contents/Resources/AppIcon.icns`가 저장소 파일과 같고, `CFBundleIconFile`이 있으며, `codesign --verify --strict --deep`가 통과함.
+- `NSWorkspace.icon(forFile:)`로 받은 시스템 아이콘이 새 아이콘으로 보임(macOS 27). 시스템이 둥근 사각형 가장자리에 자체 테두리 효과를 더하며, 규격 밖 아이콘을 회색 틀 안에 작게 넣는 처리는 없었음. 같은 방법으로 본 설치본 0.1.2는 기본 아이콘임.
+
+### 남은 위험
+
+- 원본이 282×222라 512px 이상으로 크게 보면 외곽선이 조금 부드러움. 고해상도 원본을 받으면 같은 스크립트로 다시 만들 수 있으나 오리기 결과를 다시 봐야 함.
+- Finder, Dock, Sparkle 창에서의 실제 표시와 release 조립, 공증은 다음 배포 판본에서 확인함.

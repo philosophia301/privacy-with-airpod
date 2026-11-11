@@ -31,6 +31,8 @@ fi
 mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources" "$app_dir/Contents/Frameworks"
 cp "$binary" "$app_dir/Contents/MacOS/PrivacyAirPods"
 cp Resources/Info.plist "$app_dir/Contents/Info.plist"
+# 앱 아이콘. 원본에서 다시 만들 때는 scripts/make-app-icon.py를 씀.
+cp Resources/AppIcon.icns "$app_dir/Contents/Resources/AppIcon.icns"
 sign_options=(--force --sign "$signing_identity")
 if [[ "$configuration" == release ]]; then
     # 공증 필수 조건: hardened runtime과 Apple 보안 타임스탬프.
