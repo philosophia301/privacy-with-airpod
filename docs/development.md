@@ -425,6 +425,7 @@ build-app.sh(release, hardened runtime) → --smoke-test → DMG 조립·서명 
 - 개발 기본 구성을 별도 경로에 빌드해 SDK 27.0 기록과 서명을 확인함. 사용 중인 `.build/Privacy AirPods.app`은 교체하지 않았음.
 - 인증서 없음, 공증 프로필 없음, 잘못된 인자의 실패 메시지를 확인함.
 - 사용자 Developer ID(`K8QJH6APX6`, 2027-12-11 만료)로 전체 실행 종료 0. 제출 `2d5cdd93-e598-4225-9447-16aeeda3df39`는 Accepted, issues 없음. `stapler validate` 통과, DMG와 앱 모두 `spctl` accepted `source=Notarized Developer ID`. 산출물은 `.build/distribution/20261111-184704/Privacy-AirPods-0.1.0.dmg`임.
+- 품질 정리 판본 0.1.1(빌드 2) 재배포: 전체 실행 종료 0. release `--smoke-test` OK, 제출 `6e701bd2-4bf0-47bb-a8fa-0381bfe86cb4` Accepted, issues 없음, ticket 항목 3개(DMG, 앱, 실행 파일). `stapler validate` 통과, DMG와 앱 모두 `spctl` accepted `source=Notarized Developer ID`. 실행 파일 기록은 SDK 27.0, 최소 15.0이며 `OWNED_SPACE` 문자열은 없음. 산출물은 `.build/distribution/20261111-204934/Privacy-AirPods-0.1.1.dmg`(307,710 bytes, SHA-256 `9998f67216bef538f1e56fc09fec3191d5356da4dacdf4280e0e87e92d41979c`)임.
 - DMG 사본에 quarantine 속성을 붙여 내려받은 파일을 모사했을 때 DMG와 마운트한 앱 모두 accepted였음. 실제 다운로드 경로와 다른 Mac의 첫 실행은 미확인임. arm64 전용 빌드이며 Intel Mac은 대상이 아님.
 - 품질 정리 뒤 사용자 Developer ID로 `--no-notarize` 실행 종료 0. hardened runtime release 실행 파일의 `--smoke-test`가 `smoke-test OK`로 끝나 비공개 backdrop과 소유 Space의 가림 시작, 마스크 갱신, 종료가 이 Mac에서 동작함을 확인함. AirPods 입력과 다른 Mac, 공증된 새 판본은 미확인임.
 
@@ -485,4 +486,4 @@ build-app.sh(release, hardened runtime) → --smoke-test → DMG 조립·서명 
 ### 남은 위험
 
 - 보호 중 설정 창이 가림 위로 올라오는 동작은 창 레벨 단위 검사로만 확인했으며 실제 AirPods 보호 중 화면 확인은 하지 않았음.
-- 공증된 0.1.0 DMG는 정리 전 판본임. 새 판본 배포는 버전 증가와 공증 제출이 필요함.
+- 정리 판본은 0.1.1로 다시 공증했음. 외부 공개 위치(GitHub Release 등)와 다른 Mac의 첫 실행은 미정이거나 미확인임.

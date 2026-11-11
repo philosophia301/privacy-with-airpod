@@ -13,7 +13,8 @@
 - [x] 배포 후보 `--smoke-test` 추가. hardened runtime Developer ID 실행 파일에서 실제 가림 시작·갱신·종료 확인.
 - [x] Git 초기화, 기준 커밋과 정리 커밋, public `philosophia301/privacy-with-airpod` push(사용자 지시).
 - [x] 설정 창의 sample마다 전체 재계산을 `LiveReadout` 분리로 해소, 배포 빌드의 Space 진단 로그 제거.
-- [ ] 정리 뒤 판본의 공증 DMG 재배포: 버전 증가와 공증 제출 시점은 사용자가 정함.
+- [x] 정리 뒤 판본 0.1.1(빌드 2) 공증 DMG 재배포: Accepted, ticket 첨부, Gatekeeper 통과.
+- [ ] 0.1.1 DMG의 외부 공개 위치 결정과 다른 Mac 첫 실행 확인.
 
 ## 최신 작업 — 본인 계정 DMG 직접 배포 (2026-11-11)
 
