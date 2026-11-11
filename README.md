@@ -17,7 +17,6 @@ AirPods를 착용한 사용자가 고개를 돌리거나 자리를 벗어날 때
 | 개발 단계와 선행 조건 | [ROADMAP](ROADMAP.md) |
 | 기술적으로 확인한 사실과 아직 모르는 것 | [기술 타당성 조사](docs/feasibility.md) |
 | 작업 규칙·배치 지도·검증 안내 | [AGENTS](AGENTS.md) |
-| agent 협업 실험 방식 | [Agent workflow](docs/agent-workflow/README.md) |
 
 제품 행동을 먼저 합의하고 필요한 기술 가정을 작은 실험으로 확인한 뒤 앱을 구현함. 권한·실패 시 동작·블러 해제 방식은 spec의 결정 후보이며 기본값으로 확정하지 않았음.
 

@@ -1,6 +1,6 @@
 # 작업 수행 절차
 
-ROADMAP의 한 단위를 TODO의 작은 Phase로 나누고 결정·검증·리뷰 경계를 유지함. 이 문서는 제품 작업 절차이며 agent를 몇 개 쓰는지는 [agent-workflow](../agent-workflow/README.md)가 정함.
+ROADMAP의 한 단위를 TODO의 작은 Phase로 나누고 결정·검증·리뷰 경계를 유지함. 이 문서는 제품 작업 절차이며 agent 수와 운영 방식은 이 repo에서 정하지 않음.
 
 ## 문서마다 한 가지 정본을 둠
 

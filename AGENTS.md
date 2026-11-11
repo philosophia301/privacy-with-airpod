@@ -29,8 +29,6 @@ AirPods 착용 중 고개를 돌리거나 자리를 벗어나면 Mac 화면을 �
 | `docs/feasibility.md` | 플랫폼 조사 근거·기술 가정·실기기 검증 계획 |
 | `docs/assets/blur-reference/` | 사용자가 제공한 블러 reference 이미지 원본. 해석과 결정은 spec 소유 |
 | `docs/rules/` | spec 결정·작업·테스트·작성 규칙 |
-| `docs/agent-workflow/README.md` | agent 역할·위임·static/dynamic 운영 방식 |
-| `docs/agent-workflow/experiments/` | 날짜별 실험 방법·결과·비용·한계 |
 | `docs/references.md` | 이번 규칙의 출처와 차용 범위 |
 
 사용자가 구현 방법을 자율 위임했으므로 승인된 행동·권한·데이터 경계 안에서 구조를 결정하고 소스 작성 전에 이 지도에 반영함. 기존 책임을 다른 경로에 복제하지 않으며, 예정 모듈을 이미 존재하는 것처럼 쓰지 않음. 구체 위임은 [spec](docs/spec.md#구현자에게-맡긴-범위--사용자-위임)이 소유함.
@@ -43,7 +41,6 @@ AirPods 착용 중 고개를 돌리거나 자리를 벗어나면 Mac 화면을 �
 | 착수·finding·검증·리뷰·커밋 | [workflow](docs/rules/workflow.md) |
 | 테스트 추가·수정·완료 근거 판정 | [testing-levels](docs/rules/testing-levels.md) |
 | 문서·주석·이름·사용자 설명 | [writing](docs/rules/writing.md) |
-| subagent·orchestration·workflow 실험 | [agent-workflow](docs/agent-workflow/README.md) |
 
 ## 현재 검증
 

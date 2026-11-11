@@ -179,8 +179,6 @@ LatestRenderWork는 실행 중 작업과 최신 대기 작업만 유지함. Scre
 
 전체 42개 검사(XCTest 6개 + Swift Testing 36개) 통과. 추가 검사는 처리 중 99개의 요청을 최신 하나로 병합, 정지 후 대기 폐기·입력 거부, 고해상도 분기의 원본 출력 크기·선명한 1픽셀 무늬 대비 보존·가려지는 쪽 대비 감소임. 실제 AirPods 입력을 쓰는 장시간 보호, 스크롤 체감, 다중 모니터 총부하·프레임 전달 대기 시간은 미측정임.
 
-이번 좁은 렌더·큐 통합 변경은 메인 단독으로 처리했고 별도 worker 비용은 추가하지 않았음. orchestration 방식 간 통제 비교나 토큰 절감률을 측정한 것은 아님.
-
 최종 앱 빌드·엄격한 서명 검사와 재실행 완료. 재실행으로 메모리의 정면 기준·배치는 초기화됐음.
 
 ## 추가 성능 감사 — 같은 날 후속
@@ -193,7 +191,7 @@ LatestRenderWork는 실행 중 작업과 최신 대기 작업만 유지함. Scre
 
 ## GPU 직접 표시 — 같은 날 구현 후속
 
-사용자 승인으로 실제 화면 출력은 MetalPresenter의 CAMetalLayer로 전환했고 설정 예제는 PreviewRenderer의 별도 큐로 옮겼음. 설계·수치·남은 성능 한계는 [성능 기록](performance.md), worker 분담과 보정은 [운영 기록](agent-workflow/experiments/2026-09-14-metal-output.md)이 소유함.
+사용자 승인으로 실제 화면 출력은 MetalPresenter의 CAMetalLayer로 전환했고 설정 예제는 PreviewRenderer의 별도 큐로 옮겼음. 설계·수치·남은 성능 한계는 [성능 기록](performance.md)이 소유함.
 
 최종 swift test 종료 0, XCTest 6개 + Swift Testing 41개 = 47개 통과. 추가 검사는 GPU 실제 텍스처의 상하 색상·1px 선명 경계·Retina 크기, 잘못된 크기 거부, 중단 후 present 금지, 스트림 오류를 MainActor에 전달하기 전 GPU 닫기, 숨김 전 결과의 재표시 세대 침범 방지임. 실제 GPU 오류/hang 주입을 통과한 것은 아님.
 
