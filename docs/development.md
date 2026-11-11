@@ -424,6 +424,7 @@ build-app.sh(release, hardened runtime) → --smoke-test → DMG 조립·서명 
 - 인증서 없음, 공증 프로필 없음, 잘못된 인자의 실패 메시지를 확인함.
 - 사용자 Developer ID(`K8QJH6APX6`, 2027-12-11 만료)로 전체 실행 종료 0. 제출 `2d5cdd93-e598-4225-9447-16aeeda3df39`는 Accepted, issues 없음. `stapler validate` 통과, DMG와 앱 모두 `spctl` accepted `source=Notarized Developer ID`. 산출물은 `.build/distribution/20261111-184704/Privacy-AirPods-0.1.0.dmg`임.
 - 품질 정리 판본 0.1.1(빌드 2) 재배포: 전체 실행 종료 0. release `--smoke-test` OK, 제출 `6e701bd2-4bf0-47bb-a8fa-0381bfe86cb4` Accepted, issues 없음, ticket 항목 3개(DMG, 앱, 실행 파일). `stapler validate` 통과, DMG와 앱 모두 `spctl` accepted `source=Notarized Developer ID`. 실행 파일 기록은 SDK 27.0, 최소 15.0이며 `OWNED_SPACE` 문자열은 없음. 산출물은 `.build/distribution/20261111-204934/Privacy-AirPods-0.1.1.dmg`(307,710 bytes, SHA-256 `9998f67216bef538f1e56fc09fec3191d5356da4dacdf4280e0e87e92d41979c`)임.
+- 업데이트 기능을 넣은 0.1.2(빌드 3) 배포: 전체 실행 종료 0. release `--smoke-test` OK, 제출 `e0921b6a-2a95-4c84-8c37-9ed61e44de96` Accepted, issues 없음. ticket 항목 17개에 앱, 실행 파일, Sparkle framework, Autoupdate, Updater.app이 포함됨. `stapler validate` 통과, DMG와 앱 모두 `spctl` accepted `source=Notarized Developer ID`. 산출물은 `.build/distribution/20261111-214459/Privacy-AirPods-0.1.2.dmg`(1,189,499 bytes, SHA-256 `5f9e94a7e8e340913cad698ea958535398b8b8c00a8435caac27d536930251f6`)이며 GitHub Release `v0.1.2`로 공개함.
 - DMG 사본에 quarantine 속성을 붙여 내려받은 파일을 모사했을 때 DMG와 마운트한 앱 모두 accepted였음. 실제 다운로드 경로와 다른 Mac의 첫 실행은 미확인임. arm64 전용 빌드이며 Intel Mac은 대상이 아님.
 - 품질 정리 뒤 사용자 Developer ID로 `--no-notarize` 실행 종료 0. hardened runtime release 실행 파일의 `--smoke-test`가 `smoke-test OK`로 끝나 비공개 backdrop과 소유 Space의 가림 시작, 마스크 갱신, 종료가 이 Mac에서 동작함을 확인함. AirPods 입력과 다른 Mac, 공증된 새 판본은 미확인임.
 
@@ -534,6 +535,8 @@ EdDSA 비밀 키는 `generate_keys --account privacy-airpods`로 만들어 이 M
   - 업데이트 설치 → DMG 내려받기, EdDSA 확인 뒤 "설치 준비 완료" → 설치 후 재실행. 같은 경로의 앱이 0.1.3(빌드 4)으로 바뀌고 서명 검사 통과, 재실행한 앱의 설정 창은 막히지 않음. 마지막 "설치 후 재실행" 클릭은 자동 조작이 오류를 반환한 뒤 설치가 진행되어 누가 눌렀는지는 확정하지 못함.
   - Sparkle 창을 닫은 뒤에도 설정 창은 막힌 채이고 안내의 업데이트 버튼이 Sparkle 창을 다시 엶. `CFBundleDevelopmentRegion` 추가 뒤 Sparkle 창이 한국어로 표시됨.
   - 서버를 끈 채 구판본을 실행하면 설정 창이 막히지 않음.
+- 실제 공개(2026-11-11, 사용자 승인): `publish-update.py`로 GitHub Release `v0.1.2`(태그는 판본 커밋 `224f720`)를 만들고 appcast 항목을 main에 push함. Release 주소에서 받은 DMG는 크기와 SHA-256이 원본과 같고, quarantine을 붙여도 `spctl` accepted `Notarized Developer ID`임. raw appcast는 push 뒤 약 3분 30초 만에 새 항목을 돌려줌(`cache-control: max-age=300`).
+- 실제 주소 업데이트: 0.1.2 앱을 0.1.1(빌드 2)로 바꿔 다시 서명한 사본을 scratchpad에서 실행함. 실제 raw appcast에서 0.1.2를 일반 업데이트(나중에, 설치, 건너뛰기)로 제안했고 설정 창은 막히지 않음. 설치를 고르면 GitHub에서 받고 EdDSA 확인 뒤 "설치 & 재실행"으로 교체함. 교체된 앱은 0.1.2(빌드 3)이고 실행 파일이 배포 산출물과 같으며 `spctl` accepted `Notarized Developer ID`, 재실행 뒤 추가 제안 없음. 이번에도 마지막 클릭은 자동 조작이 오류를 반환했으나 직후 설치가 진행되어, 클릭 직후 창이 바뀌어 검증만 실패한 것으로 봄. 시험 뒤 실제 앱 ID의 사용자 기본값에 생긴 `SULastCheckTime`, `SUUpdateGroupIdentifier`와 캐시 폴더를 지움.
 - `publish-update.py`의 거부 경로: 같은 빌드 재게시, 이번 빌드보다 높은 필수 기준, 판본과 다른 DMG 이름에서 appcast를 바꾸지 않고 종료 1.
 - 시험 뒤 시험 번들의 사용자 기본값과 캐시를 지웠음. 시험 폴더는 scratchpad에만 있음.
 
@@ -541,5 +544,5 @@ EdDSA 비밀 키는 `generate_keys --account privacy-airpods`로 만들어 이 M
 
 - 배치 시트가 열린 상태에서 필수 판정이 들어오면 시트를 닫는 동작은 화면으로 확인하지 않았음. 실행 중 판정은 하루 주기 확인이나 메뉴의 업데이트 확인에서만 생김.
 - 메뉴 막대의 보호 켜기와 끄기가 차단 중에도 동작하는 것은 메뉴가 차단 modifier를 쓰지 않는 코드 구조로만 확인했으며, 차단 상태에서 실제 AirPods 보호는 실행하지 않았음.
-- 실제 GitHub Release와 raw appcast, 공증된 판본 사이의 업데이트는 아직 실행하지 않았음. 0.1.1 이하는 업데이트 기능이 없어 첫 판본은 직접 설치해야 함.
+- 실제 Release 경로의 필수(critical) 차단은 로컬 서버로만 확인함. 0.1.1 이하는 업데이트 기능이 없어 0.1.2를 직접 설치해야 함.
 - EdDSA 비밀 키는 이 Mac 키체인에만 있음. 백업 전에는 이 Mac을 잃으면 이후 업데이트를 낼 수 없음.
