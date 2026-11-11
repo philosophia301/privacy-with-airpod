@@ -514,7 +514,7 @@ build-app.sh(release, hardened runtime) → --smoke-test → DMG 조립·서명 
 
 ### 서명 키
 
-EdDSA 비밀 키는 `generate_keys --account privacy-airpods`로 만들어 이 Mac의 로그인 키체인에 있음. 공개 키는 Info.plist의 `SUPublicEDKey`임. 비밀 키를 잃으면 이미 설치된 앱이 이후 업데이트를 검증하지 못하므로 백업이 필요함. 백업은 `.build/artifacts/sparkle/Sparkle/bin/generate_keys --account privacy-airpods -x <파일>`로 내보내 저장소 밖 안전한 곳에 두고 내보낸 파일은 지움. `sign_update`가 키에 처음 접근할 때 키체인 암호 창이 뜨며 "항상 허용"을 고르면 다음 배포부터 묻지 않음.
+EdDSA 비밀 키는 `generate_keys --account privacy-airpods`로 만들어 이 Mac의 로그인 키체인에 있음. 공개 키는 Info.plist의 `SUPublicEDKey`임. 비밀 키를 잃어도 업데이트 경로는 끊기지 않음. Sparkle은 일반 앱 업데이트(DMG, zip)에서 EdDSA 서명과 Apple 코드 서명 중 하나만 맞으면 설치함(`SUUpdateValidator`의 키 교체 규칙, `SUVerifyUpdateBeforeExtraction`을 켜지 않은 경우). 새 키를 만들어 새 공개 키를 Info.plist에 넣고, 같은 팀 Developer ID로 서명한 판본을 새 키로 서명해 내면 기존 앱이 코드 서명으로 받아들이고 이후는 새 키로 이어짐. 키와 같은 팀의 Developer ID 서명을 함께 잃으면 기존 앱은 업데이트를 받을 수 없음. 로그인 키체인 항목은 iCloud 키체인으로 동기화되지 않으며 이 Mac은 Time Machine 대상이 없음. 다른 곳에도 두려면 `.build/artifacts/sparkle/Sparkle/bin/generate_keys --account privacy-airpods -x <파일>`로 내보내 암호 앱 같은 암호화 저장소에 넣고 내보낸 파일은 지움. `sign_update`가 키에 처음 접근할 때 키체인 암호 창이 뜨며 "항상 허용"을 고르면 다음 배포부터 묻지 않음.
 
 ### 배포 절차
 
@@ -545,4 +545,4 @@ EdDSA 비밀 키는 `generate_keys --account privacy-airpods`로 만들어 이 M
 - 배치 시트가 열린 상태에서 필수 판정이 들어오면 시트를 닫는 동작은 화면으로 확인하지 않았음. 실행 중 판정은 하루 주기 확인이나 메뉴의 업데이트 확인에서만 생김.
 - 메뉴 막대의 보호 켜기와 끄기가 차단 중에도 동작하는 것은 메뉴가 차단 modifier를 쓰지 않는 코드 구조로만 확인했으며, 차단 상태에서 실제 AirPods 보호는 실행하지 않았음.
 - 실제 Release 경로의 필수(critical) 차단은 로컬 서버로만 확인함. 0.1.1 이하는 업데이트 기능이 없어 0.1.2를 직접 설치해야 함.
-- EdDSA 비밀 키는 이 Mac 키체인에만 있음. 백업 전에는 이 Mac을 잃으면 이후 업데이트를 낼 수 없음.
+- EdDSA 비밀 키는 이 Mac 로그인 키체인에만 있음. 잃으면 위 키 교체 규칙으로 새 키로 넘어가야 하며, 이 경로는 Sparkle 소스로만 확인하고 실제로 시험하지 않았음.
