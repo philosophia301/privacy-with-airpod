@@ -23,6 +23,8 @@ struct PrivacyAirPodsApp: App {
 
     init() {
         let model = AppModel()
+        // 앱 실행 시 AirPods 입력을 한 번 시작함. 테스트는 AppModel을 직접 만들어 이 경로를 거치지 않음.
+        model.startMotion()
         _model = StateObject(wrappedValue: model)
         _icon = StateObject(wrappedValue: MenuBarIconModel(
             frames: MenuBarIconModel.bundledFrames,
@@ -32,19 +34,18 @@ struct PrivacyAirPodsApp: App {
             workspaceNotifications: NSWorkspace.shared.notificationCenter))
     }
 
-    private var experimentScene: some Scene {
-        Window("Privacy AirPods · 실험", id: "experiment") {
-            ExperimentView(model: model, update: updater.state)
+    private var settingsScene: some Scene {
+        Window("Privacy AirPods 설정", id: "settings") {
+            SettingsView(model: model, update: updater.state)
                 .background(WindowLevel(aboveCover: model.protected || model.startingProtection))
                 .background(PreviewWindowLifecycle(model: model))
         }
-        .defaultSize(width: 880, height: 760)
+        .defaultSize(width: 640, height: 820)
         .windowResizability(.contentMinSize)
-
     }
 
     var body: some Scene {
-        experimentScene.defaultLaunchBehavior(.presented)
+        settingsScene.defaultLaunchBehavior(.presented)
         MenuBarExtra {
             MenuContent(model: model, update: updater.state)
         } label: {
@@ -66,11 +67,11 @@ private struct MenuContent: View {
         Divider()
         Button(model.protected || model.startingProtection ? "보호 끄기" : "회전 블러 켜기") { model.toggleProtection() }
             .disabled(!model.protected && !model.startingProtection && !model.canProtect)
-        Button("기준 맞추기 · 설정 · 실험") {
-            openWindow(id: "experiment")
+        Button("설정 열기…") {
+            openWindow(id: "settings")
             NSApp.activate(ignoringOtherApps: true)
         }
-        Button("AirPods 입력 시작") { model.startMotion() }
+        Button("AirPods 다시 확인") { model.startMotion() }
         Divider()
         Button("업데이트 확인…") { update.checkForUpdates() }
         Button("종료") { model.quit() }

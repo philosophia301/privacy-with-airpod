@@ -33,6 +33,9 @@ protocol HeadMotionSource: AnyObject {
 
 @MainActor
 final class MotionService: HeadMotionSource {
+    /// 동작 접근 거절을 알리는 문구. 거절 여부 판별은 AppModel이 이 문구를 비교하는 한 곳에서만 함.
+    static let accessDeniedMessage = "동작 접근이 거절됨. 시스템 설정에서 권한을 확인해 주세요."
+
     private let manager = CMHeadphoneMotionManager()
     private let queue: OperationQueue = {
         let queue = OperationQueue()
@@ -48,7 +51,7 @@ final class MotionService: HeadMotionSource {
         stop()
         let status = CMHeadphoneMotionManager.authorizationStatus()
         guard status != .denied && status != .restricted else {
-            onError?("동작 접근이 거절됨. 시스템 설정에서 권한을 확인해 주세요.")
+            onError?(Self.accessDeniedMessage)
             return
         }
         guard manager.isDeviceMotionAvailable else {

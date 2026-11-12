@@ -41,6 +41,29 @@ if [[ "$menu_bar_frames" != 25 ]]; then
 fi
 rm -rf "$app_dir/Contents/Resources/MenuBarIcon"
 cp -R Resources/MenuBarIcon "$app_dir/Contents/Resources/MenuBarIcon"
+# 설정 창 상태 카드 포즈 5장(가이드에서 오린 PNG). 하나라도 없으면 설정 창의 그림 자리가 비므로 중단함.
+character_poses=(lost think relax cheer guard)
+for pose in "${character_poses[@]}"; do
+    if [[ ! -f "Resources/Character/$pose.png" ]]; then
+        echo "Resources/Character에 lost, think, relax, cheer, guard PNG 5장이 필요함(없는 파일: $pose.png). python3 -I scripts/cut-character-poses.py <가이드 PDF>로 다시 만듦." >&2
+        exit 1
+    fi
+done
+rm -rf "$app_dir/Contents/Resources/Character"
+mkdir -p "$app_dir/Contents/Resources/Character"
+for pose in "${character_poses[@]}"; do
+    cp "Resources/Character/$pose.png" "$app_dir/Contents/Resources/Character/$pose.png"
+done
+# 설정 창 글꼴(Bagel Fat One, SIL OFL 1.1). 라이선스 문서를 글꼴과 함께 넣어야 재배포 조건을 지킴.
+for font in BagelFatOne-Regular.ttf BagelFatOne-OFL.txt; do
+    if [[ ! -f "Resources/Fonts/$font" ]]; then
+        echo "Resources/Fonts/$font이 필요함. Bagel Fat One 원본과 OFL 문서를 함께 둠." >&2
+        exit 1
+    fi
+done
+rm -rf "$app_dir/Contents/Resources/Fonts"
+mkdir -p "$app_dir/Contents/Resources/Fonts"
+cp Resources/Fonts/BagelFatOne-Regular.ttf Resources/Fonts/BagelFatOne-OFL.txt "$app_dir/Contents/Resources/Fonts/"
 sign_options=(--force --sign "$signing_identity")
 if [[ "$configuration" == release ]]; then
     # 공증 필수 조건: hardened runtime과 Apple 보안 타임스탬프.

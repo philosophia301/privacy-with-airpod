@@ -21,3 +21,8 @@ AirPods를 착용한 사용자가 고개를 돌리거나 자리를 벗어날 때
 제품 행동을 먼저 합의하고 필요한 기술 가정을 작은 실험으로 확인한 뒤 앱을 구현함. 권한·실패 시 동작·블러 해제 방식은 spec의 결정 후보이며 기본값으로 확정하지 않았음.
 
 현재 화면 보호는 Blur Lab에서 확인한 색조 없는 실시간 가변 블러를 Privacy AirPods 본체에 통합한 경로임. 화면 캡처 없이 독립 합성 공간에서 고개 방향에 따른 경계를 적용함. Lab도 같은 출력 코드를 사용하며 비교 진단용으로 유지함. 비공개 macOS API에 의존하므로 OS 호환성과 배포 검증은 별도임. 통합 검증 범위는 [개발 안내](docs/development.md#본체-통합--2026-09-15)를 참조함.
+
+## 캐릭터와 글꼴 출처
+
+- 설정 창의 아기상어 캐릭터는 © The Pinkfong Company의 그림이며 공개 저장소와 배포 DMG에 포함함. 가이드에서 오린 포즈 5장은 `Resources/Character/`에 있음.
+- 글꼴 Bagel Fat One은 SIL Open Font License 1.1을 따름. 원문은 [BagelFatOne-OFL.txt](Resources/Fonts/BagelFatOne-OFL.txt)에 있음.

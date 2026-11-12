@@ -35,16 +35,16 @@ final class AppModel: ObservableObject {
     }
     @Published var demo = true
     @Published var demoAngle = 0.0
-    @Published var direction = -1.0 { didSet { refreshAngle() } }
+    /// CoreMotion yaw는 위에서 볼 때 왼쪽 회전이 양수라서 뒤집어 오른쪽 회전을 양수로 맞춤. 바꾸는 기능은 없음.
+    private let direction = -1.0
     @Published var maximumBlur = 31.25
     @Published var responseTime = 0.18
     @Published var connectionWidth = 25.0
     @Published var startAngle = 35.0
     @Published private(set) var deskReference: Double?
     @Published private(set) var appliedPoses: [DisplayPose] = []
-    @Published private(set) var probe = InertialProbe()
-    @Published private(set) var probing = false
-    @Published var trialLabel = "앉은 채 정지"
+    /// 마지막 입력 오류가 동작 접근 거절인지 나타냄. 거절 문구 비교는 `invalidateMotion` 한 곳에서만 함.
+    @Published private(set) var motionAccessDenied = false
     let readout = LiveReadout()
 
     private let motion: HeadMotionSource
@@ -57,13 +57,12 @@ final class AppModel: ObservableObject {
     private var ticking = false
     private var filteredYaw: Double?
     private var lastTick: TimeInterval
-    private var probeStartedAt: TimeInterval?
     private var request = 0
     private var retainingForInputLoss = false
     private var previewWindowVisible = false
 
     private var shouldTick: Bool {
-        previewWindowVisible || receiving || protected || startingProtection || probing
+        previewWindowVisible || receiving || protected || startingProtection
     }
 
     /// 실제 앱 구성: AirPods, 시스템 시계, 연결된 화면, 시스템 알림.
@@ -110,6 +109,17 @@ final class AppModel: ObservableObject {
         fresh && deskReference != nil && appliedLayout != nil && !startingProtection
     }
 
+    /// 설정 화면 준비 항목. 실제 상태에서 매번 계산하며 저장하지 않음.
+    var readinessItems: [ReadinessItem] { Readiness.items(readinessSnapshot) }
+    var readinessRemaining: Int { Readiness.remaining(readinessItems) }
+    var heroMood: HeroMood { Readiness.mood(readinessSnapshot) }
+
+    private var readinessSnapshot: ReadinessSnapshot {
+        ReadinessSnapshot(fresh: fresh, motionAccessDenied: motionAccessDenied,
+                          deskCalibrated: deskReference != nil, layoutApplied: appliedLayout != nil,
+                          screenCount: displays.count, locked: protected || startingProtection)
+    }
+
     var currentAngle: Double {
         guard let sample, let deskReference else { return 0 }
         return BlurProfile.relativeDegrees(current: sample.yaw, reference: deskReference) * direction
@@ -125,25 +135,15 @@ final class AppModel: ObservableObject {
         invalidateMotion("AirPods 입력 중지됨")
     }
 
-    func calibrateDesk() {
-        guard fresh, let sample, !protected, !startingProtection else { return }
+    /// 실제로 정면을 맞췄을 때만 true를 돌려줌. 화면의 cheer는 이 값으로만 켬.
+    @discardableResult
+    func calibrateDesk() -> Bool {
+        guard fresh, let sample, !protected, !startingProtection else { return false }
         deskReference = sample.yaw
         filteredYaw = sample.yaw
         demo = false
         refreshAngle()
-    }
-
-    func startProbe() {
-        guard fresh else { return }
-        probe.reset()
-        probeStartedAt = clock.now
-        probing = true
-        reconcileTicking()
-    }
-
-    func stopProbe() {
-        probing = false
-        reconcileTicking()
+        return true
     }
 
     func toggleProtection() {
@@ -169,7 +169,7 @@ final class AppModel: ObservableObject {
             guard attempt == request else { return }
             startingProtection = false
             protected = true
-            captureStatus = "회전 블러 실험 중 · 이탈 자동 판정은 미연결"
+            captureStatus = "보호 중"
             reconcileTicking()
             if !fresh { invalidateMotion("AirPods 입력 중단") }
         } catch {
@@ -248,7 +248,6 @@ final class AppModel: ObservableObject {
         let now = clock.now
         let dt = min(0.2, max(0, now - lastTick))
         lastTick = now
-        if probing, let began = probeStartedAt, now - began >= 10 { stopProbe() }
         if receiving && !fresh { invalidateMotion("입력이 끊김 — 연결과 착용을 확인해 주세요") }
         if fresh, let yaw = sample?.yaw {
             let alpha = 1 - exp(-dt / max(0.03, responseTime))
@@ -283,17 +282,13 @@ final class AppModel: ObservableObject {
         refreshAngle()
         let status = "입력 수신 중 · 이어버드 \(value.source)"
         if motionStatus != status { motionStatus = status }
-        if probing {
-            probe.ingest(timestamp: value.timestamp, acceleration: value.acceleration, gravity: value.gravity)
-            if probe.duration >= 10 { stopProbe() }
-        }
     }
 
     private func invalidateMotion(_ message: String) {
         receiving = false
         sample = nil
         motionStatus = message
-        probing = false
+        motionAccessDenied = message == MotionService.accessDeniedMessage
         deskReference = nil
         filteredYaw = nil
         refreshAngle()
