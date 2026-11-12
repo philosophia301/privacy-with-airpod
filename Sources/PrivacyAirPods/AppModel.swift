@@ -29,7 +29,7 @@ final class AppModel: ObservableObject {
     @Published var retainBlurOnInputLoss = false {
         didSet {
             persistSettings()
-            if !retainBlurOnInputLoss && retainingForInputLoss {
+            if !retainBlurOnInputLoss && retainingForInputLoss && !retainingForLeave {
                 releaseForInputLoss()
             }
         }
@@ -86,6 +86,9 @@ final class AppModel: ObservableObject {
     private var lastTick: TimeInterval
     private var request = 0
     private var retainingForInputLoss = false
+    /// 자리를 뜨는 중 입력이 끊겨 'AirPods를 벗으면' 설정과 무관하게 전체 블러를 유지하는 중임. 보호를 끌 때만 풀림.
+    /// 다시 착용한 뒤 입력이 또 끊겨도 이 값이 남아 있어야 두 번째 중단에서 설정대로 풀리지 않음.
+    private var retainingForLeave = false
     private var previewWindowVisible = false
     /// 머리 자세로 일어섬과 앉음을 판정함. 보호가 시작될 때마다 앉은 상태에서 다시 시작함.
     private var presence = SeatPresence()
@@ -242,6 +245,7 @@ final class AppModel: ObservableObject {
         startingProtection = false
         suspended = false
         retainingForInputLoss = false
+        retainingForLeave = false
         captureStatus = "보호 꺼짐"
         activity.stop()
         away = false
@@ -386,11 +390,15 @@ final class AppModel: ObservableObject {
         refreshAngle()
         reconcileTicking()
         guard protected || startingProtection else { return }
-        if retainBlurOnInputLoss {
+        // 일어선 뒤나 자리 비움 중의 입력 중단은 AirPods를 빼고 떠나는 경우로 보고 설정과 상관없이 가림을 유지함.
+        if isAwayWatching && (away || standingSince != nil) { retainingForLeave = true }
+        if retainBlurOnInputLoss || retainingForLeave {
             retainingForInputLoss = true
             suspended = true
             clearAway()
-            captureStatus = "입력 중단 · 전체 블러 유지 · 보호를 끄고 다시 보정해 주세요"
+            captureStatus = retainingForLeave
+                ? "입력 중단 · 자리를 비운 중이라 전체 블러 유지 · 보호를 끄고 다시 보정해 주세요"
+                : "입력 중단 · 전체 블러 유지 · 보호를 끄고 다시 보정해 주세요"
             updateCovers()
         } else {
             releaseForInputLoss()

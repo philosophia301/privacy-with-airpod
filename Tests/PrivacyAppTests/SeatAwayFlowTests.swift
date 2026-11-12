@@ -183,6 +183,127 @@ struct SeatAwayFlowTests {
         #expect(try h.maskAlpha(panel) == [255, 255, 255])
     }
 
+    enum Leaving: String, CaseIterable, CustomTestStringConvertible {
+        /// 일어선 뒤 3초가 지나기 전.
+        case standing
+        /// 걷기로 자리 비움이 된 뒤.
+        case away
+        var testDescription: String { rawValue }
+    }
+
+    enum Loss: String, CaseIterable, CustomTestStringConvertible {
+        case sensorError, silence
+        var testDescription: String { rawValue }
+    }
+
+    private func loseInput(_ h: ProtectionHarness, _ loss: Loss) {
+        switch loss {
+        case .sensorError:
+            h.motion.fail("AirPods 연결 끊김")
+            h.clock.advance()
+        case .silence:
+            for _ in 0..<16 { h.clock.advance() }
+        }
+    }
+
+    /// 'AirPods를 벗으면'이 흐림 풀기여도 자리를 뜨는 중 입력이 끊기면 가림을 유지함.
+    /// 다시 끼고 입력이 또 끊기거나 설정을 바꿔도 풀리지 않고, 보호를 꺼야만 풀림.
+    @Test(arguments: Leaving.allCases, Loss.allCases)
+    func inputLossWhileLeavingKeepsFullBlurEvenWhenSetToRelease(_ leaving: Leaving, loss: Loss) async throws {
+        let h = try ProtectionHarness()
+        defer { h.tearDown() }
+        #expect(!h.model.retainBlurOnInputLoss)
+        let panel = try await h.protect()
+        h.hold(right: 0, for: 1)
+        switch leaving {
+        case .standing:
+            h.rise(by: 0.45, over: 1.2)
+            h.hold(right: 0, for: 1)
+            #expect(!h.model.away)
+            #expect(try h.maskAlpha(panel) == [0, 0, 0])
+        case .away:
+            h.activity.send(.moving)
+            h.hold(right: 0, for: 0.6)
+            #expect(h.model.away)
+        }
+
+        loseInput(h, loss)
+        #expect(h.model.protected && h.model.suspended)
+        #expect(panel.isVisible)
+        #expect(try h.maskAlpha(panel) == [255, 255, 255])
+        #expect(h.model.captureStatus.contains("자리를 비운 중이라 전체 블러 유지"))
+
+        // 다시 끼고 앉아 입력이 돌아온 뒤 또 끊겨도 설정대로 풀리지 않음.
+        h.model.startMotion()
+        h.hold(right: 0, for: 1)
+        h.rise(by: -0.45, over: 1.2)
+        h.hold(right: 0, for: 1)
+        #expect(try h.maskAlpha(panel) == [255, 255, 255])
+        loseInput(h, .silence)
+        #expect(h.model.protected)
+        #expect(try h.maskAlpha(panel) == [255, 255, 255])
+
+        // 유지 이유가 설정이 아니므로 설정을 켰다 꺼도 풀리지 않음.
+        h.model.retainBlurOnInputLoss = true
+        h.model.retainBlurOnInputLoss = false
+        #expect(h.model.protected)
+        #expect(panel.isVisible)
+
+        h.model.stopProtection()
+        #expect(!panel.isVisible)
+        #expect(h.model.protectionWindows.isEmpty)
+    }
+
+    /// 자리를 뜨는 중의 유지는 그 보호에만 해당함. 보호를 끄고 다시 켠 뒤 앉아서 입력이 끊기면 설정대로 풀림.
+    @Test func leaveRetainEndsWithProtectionAndNextSeatedLossFollowsReleaseSetting() async throws {
+        let h = try ProtectionHarness()
+        defer { h.tearDown() }
+        _ = try await h.protect()
+        h.hold(right: 0, for: 1)
+        h.activity.send(.moving)
+        h.hold(right: 0, for: 0.6)
+        loseInput(h, .sensorError)
+        #expect(h.model.protected && h.model.suspended)
+        h.model.stopProtection()
+
+        let panel = try await h.protect()
+        h.hold(right: 0, for: 1)
+        loseInput(h, .sensorError)
+        #expect(!h.model.protected)
+        #expect(!panel.isVisible)
+    }
+
+    /// 일어섰다가 3초 안에 다시 앉은 뒤의 입력 중단은 앉은 상태이므로 흐림 풀기 설정을 따름.
+    @Test func inputLossAfterSittingBackFollowsReleaseSetting() async throws {
+        let h = try ProtectionHarness()
+        defer { h.tearDown() }
+        let panel = try await h.protect()
+        h.hold(right: 0, for: 1)
+        h.rise(by: 0.45, over: 1.2)
+        h.hold(right: 0, for: 1)
+        h.rise(by: -0.45, over: 1.2)
+        h.hold(right: 0, for: 1)
+
+        loseInput(h, .sensorError)
+        #expect(!h.model.protected)
+        #expect(!panel.isVisible)
+    }
+
+    /// 스위치를 끄면 자리 이탈을 보지 않으므로 일어선 뒤의 입력 중단도 흐림 풀기 설정을 따름.
+    @Test func inputLossWhileStandingWithSwitchOffFollowsReleaseSetting() async throws {
+        let h = try ProtectionHarness()
+        defer { h.tearDown() }
+        h.model.hideWhenAway = false
+        let panel = try await h.protect()
+        h.hold(right: 0, for: 1)
+        h.rise(by: 0.45, over: 1.2)
+        h.hold(right: 0, for: 1)
+
+        loseInput(h, .sensorError)
+        #expect(!h.model.protected)
+        #expect(!panel.isVisible)
+    }
+
     @Test func notProtectedNeverEntersAway() throws {
         let h = try ProtectionHarness()
         defer { h.tearDown() }
