@@ -10,7 +10,7 @@ import PrivacyCore
 struct LayoutEditingFlowTests {
     @Test func mapDragToSideAppliesAndMasksLikeTheSameLayout() async throws {
         let h = try ProtectionHarness()
-        defer { h.model.stopProtection() }
+        defer { h.tearDown() }
         var editor = LayoutEditor(poses: h.frontLayout)
         let center = LayoutEditor.mapPoint(x: 0, z: 60)
         let grabbedBody = editor.beginMapDrag(at: center)
@@ -38,7 +38,7 @@ struct LayoutEditingFlowTests {
 
     @Test func handleTwistClampsToLimitAndFaceUserYieldsAppliableLayout() throws {
         let h = try ProtectionHarness()
-        defer { h.model.stopProtection() }
+        defer { h.tearDown() }
         let start = DisplayPose(id: h.display.id, width: 40, height: 25, x: 60, y: 0, z: 60, yawDegrees: 0)
         var editor = LayoutEditor(poses: [start])
         // 오른쪽 끝 x 80에서 바깥으로 12cm 떨어진 손잡이를 잡음.
@@ -59,7 +59,7 @@ struct LayoutEditingFlowTests {
 
     @Test func emptyMapPointKeepsSelectionAndOtherScreenBadgeSelectsIt() throws {
         let h = try ProtectionHarness()
-        defer { h.model.stopProtection() }
+        defer { h.tearDown() }
         let otherID = h.display.id &+ 1
         let front = try #require(h.frontLayout.first)
         let other = DisplayPose(id: otherID, width: 40, height: 25, x: 120, y: 0, z: 60, yawDegrees: 0)
@@ -80,7 +80,7 @@ struct LayoutEditingFlowTests {
 
     @Test func keyboardAndButtonsClampToRangesAndTouchOnlySelectedScreen() throws {
         let h = try ProtectionHarness()
-        defer { h.model.stopProtection() }
+        defer { h.tearDown() }
         let selectedPose = DisplayPose(id: h.display.id, width: 40, height: 25, x: 0, y: 0, z: 60, yawDegrees: 0)
         let other = DisplayPose(id: h.display.id &+ 1, width: 30, height: 20, x: 10, y: 5, z: 80, yawDegrees: 10)
         var editor = LayoutEditor(poses: [selectedPose, other])

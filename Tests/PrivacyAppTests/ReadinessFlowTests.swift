@@ -10,7 +10,7 @@ import PrivacyCore
 struct ReadinessFlowTests {
     @Test func startingWithoutInputShowsAirPodsTodoDeskWaitAndScreensTodo() throws {
         let h = try ProtectionHarness()
-        defer { h.model.stopProtection() }
+        defer { h.tearDown() }
         let items = h.model.readinessItems
         #expect(items.map(\.state) == [.todo, .wait, .todo])
         #expect(items[0].status == "연결 안 됨" && items[0].why == "AirPods를 껴 주세요")
@@ -23,7 +23,7 @@ struct ReadinessFlowTests {
 
     @Test func freshInputCalibrationAndLayoutFinishTheChecklistInOrder() throws {
         let h = try ProtectionHarness()
-        defer { h.model.stopProtection() }
+        defer { h.tearDown() }
         h.model.startMotion()
         h.look(right: 0)
         var items = h.model.readinessItems
@@ -45,7 +45,7 @@ struct ReadinessFlowTests {
 
     @Test func protectionLocksDeskAndLayoutActionsUntilStopped() async throws {
         let h = try ProtectionHarness()
-        defer { h.model.stopProtection() }
+        defer { h.tearDown() }
         try await h.protect()
         var items = h.model.readinessItems
         #expect(items.map(\.state) == [.done, .done, .done])
@@ -62,7 +62,7 @@ struct ReadinessFlowTests {
 
     @Test func silentInputReturnsAirPodsToTodoAndDeskToWaitWhileKeepingLayout() async throws {
         let h = try ProtectionHarness()
-        defer { h.model.stopProtection() }
+        defer { h.tearDown() }
         try await h.protect()
         // 기본 정책은 입력이 끊기면 보호를 풀고, 배치는 실험 실행 중 그대로 남김.
         for _ in 0..<16 { h.clock.advance() }
@@ -76,7 +76,7 @@ struct ReadinessFlowTests {
 
     @Test func losingDeskReferenceReturnsHidePreviewFromAirPodsToManual() throws {
         let h = try ProtectionHarness()
-        defer { h.model.stopProtection() }
+        defer { h.tearDown() }
         h.model.startMotion()
         h.look(right: 0)
         #expect(h.model.calibrateDesk())
@@ -99,7 +99,7 @@ struct ReadinessFlowTests {
 
     @Test func deniedMotionAccessAsksForSystemSettingsInsteadOfWearing() throws {
         let h = try ProtectionHarness()
-        defer { h.model.stopProtection() }
+        defer { h.tearDown() }
         h.model.startMotion()
         // 동작 접근 거절은 MotionService가 내는 문구 그대로 AppModel에 전달됨.
         h.motion.fail(MotionService.accessDeniedMessage)

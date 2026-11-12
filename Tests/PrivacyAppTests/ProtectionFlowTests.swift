@@ -11,7 +11,7 @@ import PrivacyCore
 struct ProtectionFlowTests {
     @Test func turningHeadMovesBlurAcrossTheLiveCover() async throws {
         let h = try ProtectionHarness()
-        defer { h.model.stopProtection() }
+        defer { h.tearDown() }
         let panel = try await h.protect()
         #expect(panel.isVisible)
         #expect(panel.frame.size == NSScreen.screens.first?.frame.size)
@@ -41,7 +41,7 @@ struct ProtectionFlowTests {
 
     @Test func outOfOrderSampleDoesNotMoveTheBlur() async throws {
         let h = try ProtectionHarness()
-        defer { h.model.stopProtection() }
+        defer { h.tearDown() }
         let panel = try await h.protect()
         h.hold(right: 45)
         #expect(try h.maskAlpha(panel) == [255, 255, 0])
@@ -60,7 +60,7 @@ struct ProtectionFlowTests {
     @Test(arguments: InputLoss.allCases, [false, true])
     func inputLossReleasesByDefaultOrKeepsFullBlurWhenOptedIn(_ loss: InputLoss, retain: Bool) async throws {
         let h = try ProtectionHarness()
-        defer { h.model.stopProtection() }
+        defer { h.tearDown() }
         h.model.retainBlurOnInputLoss = retain
         let panel = try await h.protect()
         h.hold(right: 0, for: 0.5)
@@ -105,25 +105,43 @@ struct ProtectionFlowTests {
         #expect(!panel.isVisible)
     }
 
-    @Test func screenChangeStopsProtectionAndRequiresNewLayout() async throws {
+    @Test func screenChangeStopsProtectionAndKeepsLayoutOnlyForTheSameMonitorSet() async throws {
         let h = try ProtectionHarness()
-        defer { h.model.stopProtection() }
+        defer { h.tearDown() }
         let panel = try await h.protect()
-        h.notifications.post(name: NSApplication.didChangeScreenParametersNotification, object: nil)
+        // 같은 모니터 조합이 다시 알려지면 보호는 꺼지고 정면은 다시 맞춰야 하지만 저장된 배치는 남음.
+        h.setScreens(h.screens.displays)
         #expect(!h.model.protected)
         #expect(!panel.isVisible)
-        #expect(h.model.appliedPoses.isEmpty)
+        #expect(h.model.deskReference == nil)
+        #expect(h.model.appliedPoses == h.frontLayout)
+        #expect(h.model.captureStatus == "화면 구성이 바뀜 · 정면을 다시 맞춰 주세요")
 
         h.hold(right: 0, for: 0.2)
-        h.model.calibrateDesk()
+        #expect(h.model.calibrateDesk())
+        #expect(h.model.canProtect)
+
+        // 처음 보는 조합이면 배치를 다시 받아야 하고, 그 전에는 보호를 시작할 수 없음.
+        let extra = ProtectionHarness.screen(id: h.display.id &+ 1, uuid: "EXTRA-MONITOR",
+                                             frame: CGRect(x: 1920, y: 0, width: 1920, height: 1080))
+        h.setScreens([h.display, extra])
+        #expect(h.model.appliedPoses.isEmpty)
+        #expect(h.model.captureStatus == "화면 구성이 바뀜 · 정면과 배치를 다시 맞춰 주세요")
+        h.hold(right: 0, for: 0.2)
+        #expect(h.model.calibrateDesk())
         #expect(!h.model.canProtect)
-        #expect(h.model.applyLayout(h.frontLayout))
+
+        let pair = [
+            DisplayPose(id: h.display.id, width: 40, height: 25, x: -22, y: 0, z: 60, yawDegrees: 0),
+            DisplayPose(id: extra.id, width: 40, height: 25, x: 22, y: 0, z: 60, yawDegrees: 0)
+        ]
+        #expect(h.model.applyLayout(pair))
         #expect(h.model.canProtect)
     }
 
     @Test func outputFailureKeepsEmergencyCoverUntilUserStops() async throws {
         let h = try ProtectionHarness()
-        defer { h.model.stopProtection() }
+        defer { h.tearDown() }
         let panel = try await h.protect()
         let backdrop = try #require(panel.contentView as? SpaceTransitionBackdrop)
         // UI 범위 밖 값으로 WindowServer 마스크 제출 실패를 일으킴.
@@ -148,7 +166,7 @@ struct ProtectionFlowTests {
 
     @Test func appliedLayoutDecidesWhichScreenAnglesBlur() async throws {
         let h = try ProtectionHarness()
-        defer { h.model.stopProtection() }
+        defer { h.tearDown() }
         // 40cm 화면을 오른쪽 60cm에 둠. 화면 각도는 약 33.7°~53.1°라 정면에서는 대부분 가려짐.
         let side = [DisplayPose(id: h.display.id, width: 40, height: 25, x: 60, y: 0, z: 60, yawDegrees: 0)]
         let panel = try await h.protect(layout: side)
@@ -173,7 +191,7 @@ struct ProtectionFlowTests {
 
     @Test func protectionNeedsFreshInputCalibrationAndLayout() async throws {
         let h = try ProtectionHarness()
-        defer { h.model.stopProtection() }
+        defer { h.tearDown() }
         func expectRefused() async {
             #expect(!h.model.canProtect)
             await h.model.startProtection()
@@ -195,7 +213,7 @@ struct ProtectionFlowTests {
 
     @Test func steadyHeadInputRedrawsOnlyLiveReadoutNotWholeSettingsWindow() async throws {
         let h = try ProtectionHarness()
-        defer { h.model.stopProtection() }
+        defer { h.tearDown() }
         let panel = try await h.protect()
         var modelChanges = 0
         var readoutChanges = 0
@@ -219,7 +237,7 @@ struct ProtectionFlowTests {
 
     @Test func idleAppStopsPeriodicUpdates() async throws {
         let h = try ProtectionHarness()
-        defer { h.model.stopProtection() }
+        defer { h.tearDown() }
         #expect(!h.clock.running)
         h.model.setPreviewWindowVisible(true)
         #expect(h.clock.running)

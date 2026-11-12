@@ -20,6 +20,7 @@ struct PrivacyAirPodsApp: App {
     @StateObject private var model: AppModel
     @StateObject private var updater = SparkleUpdater()
     @StateObject private var icon: MenuBarIconModel
+    @StateObject private var loginItem = LoginItemState(service: SystemLoginItemService())
 
     init() {
         let model = AppModel()
@@ -36,7 +37,7 @@ struct PrivacyAirPodsApp: App {
 
     private var settingsScene: some Scene {
         Window("Privacy AirPods 설정", id: "settings") {
-            SettingsView(model: model, update: updater.state)
+            SettingsView(model: model, update: updater.state, loginItem: loginItem)
                 .background(WindowLevel(aboveCover: model.protected || model.startingProtection))
                 .background(PreviewWindowLifecycle(model: model))
         }

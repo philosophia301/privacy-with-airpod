@@ -38,16 +38,31 @@ final class ManualClock: FrameClock {
     }
 }
 
+/// 연결된 화면 목록. AppModel 대역과 공유해 테스트가 꽂기·뽑기 상태를 바꿀 수 있게 함.
+@MainActor
+final class ScreenList {
+    var displays: [DisplayCalibration]
+
+    init(_ displays: [DisplayCalibration]) {
+        self.displays = displays
+    }
+}
+
 /// 실제 AppModel, ScreenCover, WindowServer 가림 창을 주 화면 하나에서 실행함.
-/// 대역은 AirPods 입력, 시계, 시스템 알림뿐임.
+/// 대역은 AirPods 입력, 시계, 시스템 알림, 화면 목록, 테스트 전용 기억 suite뿐임.
+/// 기억 suite는 하네스마다 따로 만들고 tearDown에서 지워 다른 테스트나 UserDefaults.standard와 섞이지 않게 함.
 @MainActor
 final class ProtectionHarness {
     let motion = FakeHeadMotion()
     let clock = ManualClock()
-    let notifications = NotificationCenter()
-    let workspace = NotificationCenter()
+    let screens: ScreenList
     let display: DisplayCalibration
-    let model: AppModel
+    let defaults: UserDefaults
+    let memory: SettingsMemory
+    private let suiteName: String
+    private(set) var notifications = NotificationCenter()
+    private(set) var workspace = NotificationCenter()
+    private(set) var model: AppModel
 
     /// 화면 크기와 무관하게 결과가 정해지도록 40cm 폭 화면을 눈앞 60cm 정면에 둔 배치.
     /// 화면 양 끝은 시선 정면에서 약 ±18.4°임.
@@ -57,10 +72,50 @@ final class ProtectionHarness {
 
     init() throws {
         let screen = try #require(NSScreen.screens.first)
-        display = try #require(DisplayLayout.connected(builtInOnly: false).first { $0.id == screen.displayID })
-        let only = display
-        model = AppModel(motion: motion, clock: clock, connectedDisplays: { [only] },
-                         notifications: notifications, workspaceNotifications: workspace)
+        let real = try #require(DisplayLayout.connected(builtInOnly: false).first { $0.id == screen.displayID })
+        // 기억 흐름은 실제 화면의 UUID에 기대므로 비어 있으면 그 결과부터 틀린 것임.
+        #expect(!real.uuid.isEmpty)
+        display = real
+        suiteName = "PrivacyAppTests.settings.\(UUID().uuidString)"
+        defaults = try #require(UserDefaults(suiteName: suiteName))
+        memory = SettingsMemory(defaults: defaults)
+        screens = ScreenList([real])
+        model = Self.makeModel(motion: motion, clock: clock, screens: screens,
+                               notifications: notifications, workspace: workspace, memory: memory)
+    }
+
+    /// 같은 기억 저장소와 화면 목록으로 앱을 다시 연 것처럼 새 AppModel을 만듦.
+    /// 이전 모델은 보호와 입력을 멈추고, 새 알림 중심을 써서 이전 모델이 다음 알림에 반응하지 않게 함.
+    /// displays를 주면 다시 열기 전에 화면 목록을 그 값으로 바꿈. 재부팅 뒤 화면 ID가 바뀌는 상황을 모사함.
+    @discardableResult
+    func relaunch(with displays: [DisplayCalibration]? = nil) -> AppModel {
+        model.stopProtection()
+        motion.stop()
+        if let displays { screens.displays = displays }
+        notifications = NotificationCenter()
+        workspace = NotificationCenter()
+        model = Self.makeModel(motion: motion, clock: clock, screens: screens,
+                               notifications: notifications, workspace: workspace, memory: memory)
+        return model
+    }
+
+    /// 화면 목록을 바꾸고 시스템이 보내는 화면 구성 변경 알림을 보냄.
+    func setScreens(_ displays: [DisplayCalibration]) {
+        screens.displays = displays
+        notifications.post(name: NSApplication.didChangeScreenParametersNotification, object: nil)
+    }
+
+    /// 실제 화면이 아니라 연결 상태만 흉내 낸 화면. 기억과 배치 대응을 검사할 때만 씀.
+    /// 이 화면으로는 보호를 시작하지 않음. ScreenCover는 실제 화면이 필요함.
+    static func screen(id: CGDirectDisplayID, uuid: String,
+                       frame: CGRect = CGRect(x: 0, y: 0, width: 1920, height: 1080)) -> DisplayCalibration {
+        DisplayCalibration(id: id, name: "테스트 화면", frame: frame, widthCM: 40, heightCM: 25, uuid: uuid)
+    }
+
+    /// 보호를 끄고 테스트 전용 기억 suite를 지움. 각 테스트가 끝날 때 한 번 호출함.
+    func tearDown() {
+        model.stopProtection()
+        defaults.removePersistentDomain(forName: suiteName)
     }
 
     /// 사용자 기준 오른쪽으로 degrees만큼 돌린 머리 방향의 sample 하나를 보냄.
@@ -98,5 +153,12 @@ final class ProtectionHarness {
         let backdrop = try #require(panel.contentView as? SpaceTransitionBackdrop)
         let data = try #require(backdrop.maskImage.dataProvider?.data) as Data
         return [0, 128, 255].map { data[$0 * 4 + 3] }
+    }
+
+    private static func makeModel(motion: FakeHeadMotion, clock: ManualClock, screens: ScreenList,
+                                  notifications: NotificationCenter, workspace: NotificationCenter,
+                                  memory: SettingsMemory) -> AppModel {
+        AppModel(motion: motion, clock: clock, connectedDisplays: { [screens] in screens.displays },
+                 notifications: notifications, workspaceNotifications: workspace, memory: memory)
     }
 }

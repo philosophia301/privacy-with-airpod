@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 // 설정 창 루트. 상태 카드, 폴더 탭, 판본 줄을 조립함. 준비 규칙과 보호 정책은 AppModel과 Readiness가 소유함.
 // 이 view는 sample마다 바뀌는 값(LiveReadout)을 읽지 않음. 읽으면 steady 입력에서도 창 전체가 다시 그려짐.
@@ -10,6 +11,7 @@ enum SettingsTab {
 struct SettingsView: View {
     @ObservedObject var model: AppModel
     let update: UpdateState
+    @ObservedObject var loginItem: LoginItemState
     @State private var tab = SettingsTab.ready
     @State private var cheering = false
     @State private var cheerToken = 0
@@ -34,6 +36,11 @@ struct SettingsView: View {
         .modifier(RequiredUpdateGate(state: update, protecting: model.protected || model.startingProtection))
         .sheet(isPresented: $showingLayout) { LayoutSheet(model: model, update: update) }
         .task(id: cheerToken) { await holdCheer(token: cheerToken) }
+        // 설정 창이 보일 때와 앱이 활성화될 때 시스템 설정에서 바뀐 로그인 항목 값을 다시 읽음.
+        .onAppear { loginItem.refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            loginItem.refresh()
+        }
     }
 
     private var mood: CharacterMood {
@@ -91,7 +98,7 @@ struct SettingsView: View {
         Group {
             switch tab {
             case .ready:
-                ReadyTab(model: model, onCalibrate: calibrate, onOpenLayout: { showingLayout = true })
+                ReadyTab(model: model, loginItem: loginItem, onCalibrate: calibrate, onOpenLayout: { showingLayout = true })
             case .hide:
                 HideTab(model: model)
             }

@@ -5,6 +5,7 @@ import SwiftUI
 
 struct ReadyTab: View {
     @ObservedObject var model: AppModel
+    @ObservedObject var loginItem: LoginItemState
     let onCalibrate: () -> Void
     let onOpenLayout: () -> Void
 
@@ -18,6 +19,7 @@ struct ReadyTab: View {
             .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
             LossChoice(model: model)
+            LoginItemRow(loginItem: loginItem)
         }
     }
 
@@ -244,5 +246,54 @@ private struct LossIcon: View {
         }
         .frame(width: 52, height: 36)
         .accessibilityHidden(true)
+    }
+}
+
+// '로그인할 때 열기' 줄. 기본은 꺼짐이며 사용자가 켜야 macOS 로그인 항목에 등록됨.
+// 스위치 값과 등록 결과는 LoginItemState가 소유하고 여기서는 표시와 안내만 함.
+private struct LoginItemRow: View {
+    @ObservedObject var loginItem: LoginItemState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 12) {
+                Text("로그인할 때 열기")
+                    .font(CheekyFont.text(14, weight: .bold))
+                Spacer(minLength: 0)
+                Toggle("로그인할 때 열기", isOn: Binding(
+                    get: { loginItem.status == .on },
+                    set: { loginItem.setEnabled($0) }
+                ))
+                .toggleStyle(.switch)
+                .labelsHidden()
+                .tint(CheekyPalette.cocoa)
+            }
+            notice
+        }
+    }
+
+    // 오류 문구는 상태별 안내 앞에 붙임. 승인 대기 중에 오류가 나도 시스템 설정으로 가는 길은 남김.
+    @ViewBuilder
+    private var notice: some View {
+        if let message = loginItem.errorMessage {
+            noticeText(message)
+        }
+        switch loginItem.status {
+        case .needsApproval:
+            HStack(spacing: 8) {
+                noticeText("시스템 설정의 로그인 항목에서 허용해 주세요")
+                Button("시스템 설정 열기") { loginItem.openSystemSettings() }
+                    .buttonStyle(CheekyButtonStyle())
+            }
+        case .off, .on:
+            EmptyView()
+        }
+    }
+
+    private func noticeText(_ text: String) -> some View {
+        Text(text)
+            .font(CheekyFont.text(12, weight: .semibold))
+            .foregroundStyle(CheekyPalette.cocoa)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }

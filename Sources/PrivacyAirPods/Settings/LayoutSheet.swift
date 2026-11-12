@@ -9,8 +9,8 @@ struct LayoutSheet: View {
     let update: UpdateState
     @Environment(\.dismiss) private var dismiss
     @State private var editor: LayoutEditor
-    @State private var armLength = HumanGuide.female.armLengthCM
-    @State private var avatar = HumanGuide.female
+    @State private var armLength: Double
+    @State private var avatar: HumanGuide
     @State private var showingArm = false
     @State private var manual: Bool
     @State private var manualYaw = 0.0
@@ -20,6 +20,9 @@ struct LayoutSheet: View {
         self.model = model
         self.update = update
         _editor = State(initialValue: LayoutEditor(poses: model.layoutDraft))
+        // 팔 길이와 모형은 마지막으로 적용한 값에서 시작함. 취소하면 model 값을 그대로 둠.
+        _armLength = State(initialValue: model.armLengthCM)
+        _avatar = State(initialValue: model.armGuide)
         // AirPods 고개 값은 보정 뒤에만 있으므로 보정 전에는 직접 값으로 시작함.
         _manual = State(initialValue: model.deskReference == nil)
     }
@@ -222,7 +225,7 @@ struct LayoutSheet: View {
     }
 
     private func apply() {
-        if model.applyLayout(editor.poses) {
+        if model.applyLayout(editor.poses, armLengthCM: armLength, armGuide: avatar) {
             dismiss()
         } else {
             error = "화면 구성이 바뀌었어요. 다시 열어 주세요"

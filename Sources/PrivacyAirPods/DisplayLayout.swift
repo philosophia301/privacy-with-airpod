@@ -8,7 +8,11 @@ struct DisplayCalibration: Identifiable {
     var widthCM: Double = 0
     var heightCM: Double = 0
     var builtin = false
+    /// 재부팅과 재연결을 넘어 같은 모니터를 알아보는 식별자. 시스템이 못 주면 빈 값이며 그 조합은 기억하지 않음.
+    var uuid: String = ""
 
+    /// macOS 회전 설정이 반영된 frame 기준. 저장 배치의 방향과 비교할 때 씀.
+    var isPortrait: Bool { frame.height > frame.width }
 }
 
 enum DisplayLayout {
@@ -124,7 +128,13 @@ extension DisplayLayout {
                 display.widthCM = (rotated ? size.height : size.width) / 10
                 display.heightCM = (rotated ? size.width : size.height) / 10
                 display.builtin = CGDisplayIsBuiltin(display.id) != 0
+                display.uuid = uuidString(for: display.id)
                 return display
             }
+    }
+
+    private static func uuidString(for id: CGDirectDisplayID) -> String {
+        guard let uuid = CGDisplayCreateUUIDFromDisplayID(id)?.takeRetainedValue() else { return "" }
+        return CFUUIDCreateString(nil, uuid) as String? ?? ""
     }
 }

@@ -28,6 +28,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var suspended = false
     @Published var retainBlurOnInputLoss = false {
         didSet {
+            persistSettings()
             if !retainBlurOnInputLoss && retainingForInputLoss {
                 releaseForInputLoss()
             }
@@ -37,10 +38,13 @@ final class AppModel: ObservableObject {
     @Published var demoAngle = 0.0
     /// CoreMotion yaw는 위에서 볼 때 왼쪽 회전이 양수라서 뒤집어 오른쪽 회전을 양수로 맞춤. 바꾸는 기능은 없음.
     private let direction = -1.0
-    @Published var maximumBlur = 31.25
-    @Published var responseTime = 0.18
-    @Published var connectionWidth = 25.0
-    @Published var startAngle = 35.0
+    @Published var maximumBlur = 31.25 { didSet { persistSettings() } }
+    @Published var responseTime = 0.18 { didSet { persistSettings() } }
+    @Published var connectionWidth = 25.0 { didSet { persistSettings() } }
+    @Published var startAngle = 35.0 { didSet { persistSettings() } }
+    /// 배치 시트의 팔 길이와 모형. 시트에서 '이 배치 적용'을 눌러야만 여기에 들어옴.
+    @Published var armLengthCM = HumanGuide.female.armLengthCM { didSet { persistSettings() } }
+    @Published var armGuide = HumanGuide.female { didSet { persistSettings() } }
     @Published private(set) var deskReference: Double? {
         // AirPods 보기는 정면 기준이 있어야 고를 수 있음. 기준이 사라졌는데 그 보기에 남으면
         // 미리보기는 전체 블러로 멈추고 고개 슬라이더는 잠기므로 직접 돌려보기로 돌려놓음.
@@ -54,6 +58,9 @@ final class AppModel: ObservableObject {
     private let motion: HeadMotionSource
     private let clock: FrameClock
     private let connectedDisplays: @MainActor () -> [DisplayCalibration]
+    private let memory: SettingsMemory
+    /// 저장된 설정을 적용하는 동안에는 한 항목씩 바뀔 때마다 쓰지 않도록 막음.
+    private var restoringSettings = false
     private let cover = ScreenCover()
     private let previewRenderer = PreviewRenderer()
     private let exampleImage = ExampleScreen.make()
@@ -73,17 +80,21 @@ final class AppModel: ObservableObject {
     convenience init() {
         self.init(motion: MotionService(), clock: SystemFrameClock(),
                   connectedDisplays: { DisplayLayout.connected() },
-                  notifications: .default, workspaceNotifications: NSWorkspace.shared.notificationCenter)
+                  notifications: .default, workspaceNotifications: NSWorkspace.shared.notificationCenter,
+                  memory: SettingsMemory(defaults: .standard))
     }
 
-    /// 테스트는 입력, 시계, 화면 목록, 알림 경계만 대역으로 바꾸고 나머지 보호 경로는 실제로 실행함.
+    /// 테스트는 입력, 시계, 화면 목록, 알림, 기억 저장소 경계만 대역으로 바꾸고 나머지 보호 경로는 실제로 실행함.
     init(motion: HeadMotionSource, clock: FrameClock,
          connectedDisplays: @escaping @MainActor () -> [DisplayCalibration],
-         notifications: NotificationCenter, workspaceNotifications: NotificationCenter) {
+         notifications: NotificationCenter, workspaceNotifications: NotificationCenter,
+         memory: SettingsMemory) {
         self.motion = motion
         self.clock = clock
         self.connectedDisplays = connectedDisplays
+        self.memory = memory
         lastTick = clock.now
+        restoreSettings()
         previewRenderer.onFrame = { [weak self] frame in self?.readout.previewImage = frame.image }
         previewRenderer.onFailure = { [weak self] in self?.readout.previewImage = nil }
         refreshDisplays()
@@ -225,6 +236,16 @@ final class AppModel: ObservableObject {
               let layout = CompiledLayout(poses: poses) else { return false }
         appliedLayout = layout
         appliedPoses = poses
+        saveLayoutForCurrentDisplays()
+        return true
+    }
+
+    /// 배치 시트의 '이 배치 적용'. 팔 길이와 모형은 배치가 적용될 때만 함께 바뀜.
+    @discardableResult
+    func applyLayout(_ poses: [DisplayPose], armLengthCM: Double, armGuide: HumanGuide) -> Bool {
+        guard applyLayout(poses) else { return false }
+        self.armLengthCM = armLengthCM
+        self.armGuide = armGuide
         return true
     }
 
@@ -334,19 +355,63 @@ final class AppModel: ObservableObject {
         }
     }
 
-    private func refreshDisplays() {
+    /// 화면 목록을 갱신하고 같은 조합의 저장 배치가 되살아났는지 돌려줌.
+    @discardableResult
+    private func refreshDisplays() -> Bool {
         displays = connectedDisplays()
         selectedDisplay = displays.first?.id ?? 0
+        return restoreLayoutForCurrentDisplays()
+    }
+
+    /// 저장 배치가 현재 화면 구성과 맞고 CompiledLayout이 만들어질 때만 적용함. 아니면 배치를 비움.
+    private func restoreLayoutForCurrentDisplays() -> Bool {
+        appliedPoses = []
+        appliedLayout = nil
+        guard let key = SettingsMemory.combinationKey(for: displays),
+              let stored = memory.loadLayout(for: key),
+              let poses = SettingsMemory.restoredPoses(stored, displays: displays),
+              let layout = CompiledLayout(poses: poses) else { return false }
+        appliedPoses = poses
+        appliedLayout = layout
+        return true
+    }
+
+    private func saveLayoutForCurrentDisplays() {
+        guard let key = SettingsMemory.combinationKey(for: displays),
+              let stored = SettingsMemory.storedPoses(appliedPoses, displays: displays) else { return }
+        memory.saveLayout(stored, for: key)
+    }
+
+    private func restoreSettings() {
+        guard let stored = memory.loadSettings() else { return }
+        restoringSettings = true
+        defer { restoringSettings = false }
+        startAngle = stored.startAngle
+        maximumBlur = stored.maximumBlur
+        connectionWidth = stored.connectionWidth
+        responseTime = stored.responseTime
+        retainBlurOnInputLoss = stored.retainBlurOnInputLoss
+        armLengthCM = stored.armLengthCM
+        armGuide = stored.armGuide.guide
+    }
+
+    /// 직접 돌려보기 값, 보호 상태, 정면 기준은 여기 넣지 않음. 다시 열면 기본값에서 시작함.
+    private func persistSettings() {
+        guard !restoringSettings else { return }
+        memory.saveSettings(StoredSettings(startAngle: startAngle, maximumBlur: maximumBlur,
+                                           connectionWidth: connectionWidth, responseTime: responseTime,
+                                           retainBlurOnInputLoss: retainBlurOnInputLoss,
+                                           armLengthCM: armLengthCM, armGuide: StoredGuide(armGuide)))
     }
 
     @objc private func screenChanged() {
         stopProtection()
         deskReference = nil
         filteredYaw = nil
-        appliedPoses = []
-        appliedLayout = nil
-        refreshDisplays()
-        captureStatus = "화면 구성이 바뀜 · 정면과 배치를 다시 맞춰 주세요"
+        let restored = refreshDisplays()
+        captureStatus = restored
+            ? "화면 구성이 바뀜 · 정면을 다시 맞춰 주세요"
+            : "화면 구성이 바뀜 · 정면과 배치를 다시 맞춰 주세요"
     }
 
     @objc private func willSleep() {
