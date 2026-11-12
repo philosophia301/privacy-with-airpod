@@ -19,8 +19,33 @@ struct HideTab: View {
                 MonitorPreview(readout: model.readout)
                 GazeRow(demo: model.demo, demoAngle: $model.demoAngle, readout: model.readout)
                 TuningGrid(model: model)
+                AwayRow(model: model)
             }
         }
+    }
+}
+
+// 자리 이탈 가리기 스위치. 판정과 복귀 규칙은 AppModel이 소유하고 여기서는 값만 바꿈.
+// 640x820 창에서 조절값 아래 남는 높이가 한 줄뿐이라 설명은 짧게 같은 줄에 두고 전체 문장은 툴팁으로 줌.
+private struct AwayRow: View {
+    @ObservedObject var model: AppModel
+    private static let help = "일어선 뒤 3초가 지나거나 걸으면 화면 전체를 흐려요. 다시 앉으면 돌아와요"
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text("자리를 뜨면 가리기")
+                .font(CheekyFont.text(14, weight: .bold))
+            Text("일어서고 3초 뒤, 걸으면 바로")
+                .font(CheekyFont.text(12, weight: .semibold))
+                .foregroundStyle(CheekyPalette.cocoa)
+            Spacer(minLength: 0)
+            Toggle("자리를 뜨면 가리기", isOn: $model.hideWhenAway)
+                .toggleStyle(.switch)
+                .labelsHidden()
+                .tint(CheekyPalette.cocoa)
+                .accessibilityHint(Text(Self.help))
+        }
+        .help(Text(Self.help))
     }
 }
 

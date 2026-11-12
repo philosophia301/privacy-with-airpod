@@ -13,10 +13,13 @@ struct RenderSettings: Sendable, Equatable {
 
     var field: Field
     var radius: Double
+    /// 자리 비움 가림 정도. 0은 고개 따라가기, 1은 위치와 무관한 최대 블러임.
+    var coverage: Double
 
-    init(field: Field, radius: Double) {
+    init(field: Field, radius: Double, coverage: Double = 0) {
         self.field = field
         self.radius = radius
+        self.coverage = coverage
     }
 
     static func covered(radius: Double = 45) -> RenderSettings {
@@ -37,6 +40,12 @@ struct RenderSettings: Sendable, Equatable {
 
     /// x는 화면 왼쪽 0, 오른쪽 1인 정규화 위치임. 결과 1은 최대 블러임.
     func strength(at x: Double) -> Double {
+        // 자리 비움 가림은 고개 값과 무관하게 최대 블러 쪽으로 끌어올림. 판정이 깨진 값은 가리는 쪽으로 둠.
+        let cover = min(1, max(0, coverage.isFinite ? coverage : 1))
+        return cover + (1 - cover) * followStrength(at: x)
+    }
+
+    private func followStrength(at x: Double) -> Double {
         switch field {
         case .covered:
             1

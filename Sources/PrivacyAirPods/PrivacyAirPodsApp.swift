@@ -68,6 +68,9 @@ private struct MenuContent: View {
         Divider()
         Button(model.protected || model.startingProtection ? "보호 끄기" : "회전 블러 켜기") { model.toggleProtection() }
             .disabled(!model.protected && !model.startingProtection && !model.canProtect)
+        if model.away {
+            Button("보호 재개") { model.resumeProtection() }
+        }
         Button("설정 열기…") {
             openWindow(id: "settings")
             NSApp.activate(ignoringOtherApps: true)

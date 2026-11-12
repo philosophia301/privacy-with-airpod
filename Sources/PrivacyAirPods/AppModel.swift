@@ -34,6 +34,21 @@ final class AppModel: ObservableObject {
             }
         }
     }
+    /// 자리를 뜨면 가리기 스위치. 끄면 자리 이탈을 보지 않고, 자리 비움 중이었다면 바로 돌아옴.
+    @Published var hideWhenAway = true {
+        didSet {
+            persistSettings()
+            guard protected, hideWhenAway != oldValue else { return }
+            if hideWhenAway {
+                beginAwayWatch()
+            } else {
+                activity.stop()
+                resumeProtection()
+            }
+        }
+    }
+    /// 자리 비움으로 가린 상태인지 나타냄. 상태 문구와 '보호 재개' 단추가 이 값만 봄.
+    @Published private(set) var away = false
     @Published var demo = true
     @Published var demoAngle = 0.0
     /// CoreMotion yaw는 위에서 볼 때 왼쪽 회전이 양수라서 뒤집어 오른쪽 회전을 양수로 맞춤. 바꾸는 기능은 없음.
@@ -58,6 +73,7 @@ final class AppModel: ObservableObject {
     private let motion: HeadMotionSource
     private let clock: FrameClock
     private let connectedDisplays: @MainActor () -> [DisplayCalibration]
+    private let activity: HeadActivitySource
     private let memory: SettingsMemory
     /// 저장된 설정을 적용하는 동안에는 한 항목씩 바뀔 때마다 쓰지 않도록 막음.
     private var restoringSettings = false
@@ -71,9 +87,27 @@ final class AppModel: ObservableObject {
     private var request = 0
     private var retainingForInputLoss = false
     private var previewWindowVisible = false
+    /// 머리 자세로 일어섬과 앉음을 판정함. 보호가 시작될 때마다 앉은 상태에서 다시 시작함.
+    private var presence = SeatPresence()
+    /// 일어선 시각. 이 시각부터 `AwayTiming.standingDelay`가 지나면 자리 비움으로 봄. 앉거나 자리 비움이면 nil.
+    private var standingSince: TimeInterval?
+    /// 고개 따라가기(0)와 최대 블러(1) 사이의 가림 정도. 자리 비움 전환을 한 번에 바꾸지 않으려고 씀.
+    private var awayCoverage = 0.0
+    /// 이 시각 전의 걷기 활동은 무시함. 앉은 직후 늦게 도착한 걷기 callback이 자리 비움을 되살려 앉은 사용자를 가두는 것을 막음.
+    private var movingIgnoredUntil: TimeInterval = 0
 
     private var shouldTick: Bool {
         previewWindowVisible || receiving || protected || startingProtection
+    }
+
+    /// 자리 이탈 판정의 시간 기준. 실측 전 임시값이며 조정할 때 여기만 바꿈.
+    private enum AwayTiming {
+        /// 일어선 뒤 다시 앉지 않고 머무는 시간. 초 단위임.
+        static let standingDelay: TimeInterval = 3
+        /// 가림 정도가 목표 값으로 옮겨 가는 시간. 초 단위이며 전환을 부드럽게 하려고 둠.
+        static let fadeDuration: TimeInterval = 0.5
+        /// 돌아온 직후 걷기 활동을 무시하는 시간. 초 단위임.
+        static let returnSettle: TimeInterval = 3
     }
 
     /// 실제 앱 구성: AirPods, 시스템 시계, 연결된 화면, 시스템 알림.
@@ -81,19 +115,23 @@ final class AppModel: ObservableObject {
         self.init(motion: MotionService(), clock: SystemFrameClock(),
                   connectedDisplays: { DisplayLayout.connected() },
                   notifications: .default, workspaceNotifications: NSWorkspace.shared.notificationCenter,
+                  activity: HeadActivityService(),
                   memory: SettingsMemory(defaults: .standard))
     }
 
-    /// 테스트는 입력, 시계, 화면 목록, 알림, 기억 저장소 경계만 대역으로 바꾸고 나머지 보호 경로는 실제로 실행함.
+    /// 테스트는 입력, 시계, 화면 목록, 알림, 활동, 기억 저장소 경계만 대역으로 바꾸고 나머지 보호 경로는 실제로 실행함.
     init(motion: HeadMotionSource, clock: FrameClock,
          connectedDisplays: @escaping @MainActor () -> [DisplayCalibration],
          notifications: NotificationCenter, workspaceNotifications: NotificationCenter,
+         activity: HeadActivitySource,
          memory: SettingsMemory) {
         self.motion = motion
         self.clock = clock
         self.connectedDisplays = connectedDisplays
+        self.activity = activity
         self.memory = memory
         lastTick = clock.now
+        activity.onActivity = { [weak self] value in self?.receiveActivity(value) }
         restoreSettings()
         previewRenderer.onFrame = { [weak self] frame in self?.readout.previewImage = frame.image }
         previewRenderer.onFailure = { [weak self] in self?.readout.previewImage = nil }
@@ -104,6 +142,7 @@ final class AppModel: ObservableObject {
             guard let self else { return }
             self.retainingForInputLoss = false
             self.suspended = true
+            self.clearAway()
             self.captureStatus = "화면 처리 중단: \(error) — 보호 끄기 후 다시 시도"
             self.updateCovers()
         }
@@ -185,6 +224,7 @@ final class AppModel: ObservableObject {
             startingProtection = false
             protected = true
             captureStatus = "보호 중"
+            beginAwayWatch()
             reconcileTicking()
             if !fresh { invalidateMotion("AirPods 입력 중단") }
         } catch {
@@ -203,8 +243,30 @@ final class AppModel: ObservableObject {
         suspended = false
         retainingForInputLoss = false
         captureStatus = "보호 꺼짐"
+        activity.stop()
+        away = false
+        standingSince = nil
+        awayCoverage = 0
         reconcileTicking()
         cover.stop()
+    }
+
+    /// 자리 비움으로 가려진 보호를 앉은 것으로 보고 고개 따라가기로 되돌림. 앉기를 놓쳤을 때 직접 쓰는 길임.
+    func resumeProtection() {
+        guard away else { return }
+        away = false
+        standingSince = nil
+        // 돌아오는 가림은 전환 없이 바로 고개 따라가기로 바꿈.
+        awayCoverage = 0
+        movingIgnoredUntil = clock.now + AwayTiming.returnSettle
+        presence.reset(to: .seated)
+        captureStatus = "보호 중"
+    }
+
+    /// 가림이 입력 중단으로 전체 블러에 고정되면 자리 비움 기록을 지움. 고정된 가림에 '자리 비움'과 '보호 재개'를 남기면 실제 가림과 문구가 어긋남.
+    private func clearAway() {
+        away = false
+        standingSince = nil
     }
 
     func quit() {
@@ -258,9 +320,12 @@ final class AppModel: ObservableObject {
                   !(live && (suspended || !fresh)) else {
                 return (display.id, RenderSettings.covered(radius: maximumBlur))
             }
-            return (display.id, RenderSettings.spatial(table, in: layout, gaze: gaze, start: startAngle,
-                                                       transitionFraction: connectionWidth / 100,
-                                                       radius: maximumBlur))
+            var settings = RenderSettings.spatial(table, in: layout, gaze: gaze, start: startAngle,
+                                                  transitionFraction: connectionWidth / 100,
+                                                  radius: maximumBlur)
+            // 자리 비움 가림은 실제 보호 값에만 씀. 미리보기 각도는 고개 값만 보여 줌.
+            if live { settings.coverage = awayCoverage }
+            return (display.id, settings)
         })
     }
 
@@ -278,6 +343,7 @@ final class AppModel: ObservableObject {
             let alpha = 1 - exp(-dt / max(0.03, responseTime))
             filteredYaw = BlurProfile.interpolatedDegrees(from: filteredYaw ?? yaw, to: yaw, fraction: alpha)
         }
+        advanceAway(dt: dt, now: now)
         if previewWindowVisible { renderPreview() }
         if protected || startingProtection { updateCovers() }
         reconcileTicking()
@@ -302,6 +368,7 @@ final class AppModel: ObservableObject {
         }
         sample = value
         if !receiving { receiving = true }
+        trackPosture(value)
         reconcileTicking()
         readout.sampleCount += 1
         refreshAngle()
@@ -322,6 +389,7 @@ final class AppModel: ObservableObject {
         if retainBlurOnInputLoss {
             retainingForInputLoss = true
             suspended = true
+            clearAway()
             captureStatus = "입력 중단 · 전체 블러 유지 · 보호를 끄고 다시 보정해 주세요"
             updateCovers()
         } else {
@@ -332,6 +400,57 @@ final class AppModel: ObservableObject {
     private func releaseForInputLoss() {
         stopProtection()
         captureStatus = "입력 중단 · 블러 해제됨 · 재착용 후 정면 보정과 보호 시작이 필요함"
+    }
+
+    /// 보호가 실제로 시작됐을 때 자리 이탈 판정을 앉은 상태에서 새로 시작함. 이전 보호의 일어섬 기록은 버림.
+    private func beginAwayWatch() {
+        presence.reset(to: .seated)
+        standingSince = nil
+        away = false
+        awayCoverage = 0
+        movingIgnoredUntil = 0
+        if hideWhenAway { activity.start() }
+    }
+
+    /// 판정 조건은 보호 중이고 스위치가 켜져 있으며 입력이 살아 있을 때뿐임. 중단된 가림에서는 자리를 보지 않음.
+    private var isAwayWatching: Bool {
+        protected && hideWhenAway && !suspended
+    }
+
+    /// 걷기 감지는 일어섬 판정을 기다리지 않고 바로 자리 비움으로 봄. 다시 앉을 때 돌아오도록 서 있는 자세에서 시작함.
+    private func receiveActivity(_ kind: HeadActivity) {
+        guard isAwayWatching, kind == .moving, !away, clock.now >= movingIgnoredUntil else { return }
+        presence.reset(to: .standing)
+        enterAway()
+    }
+
+    private func trackPosture(_ value: HeadSample) {
+        guard isAwayWatching else { return }
+        switch presence.ingest(timestamp: value.timestamp, acceleration: value.acceleration, gravity: value.gravity) {
+        case .stoodUp:
+            if !away { standingSince = clock.now }
+        case .satDown:
+            standingSince = nil
+            resumeProtection()
+        case nil:
+            break
+        }
+    }
+
+    /// 일어선 채 기준 시간이 지나면 자리 비움으로 보고, 가림 정도를 매 주기 목표 쪽으로 조금씩 옮김.
+    private func advanceAway(dt: Double, now: TimeInterval) {
+        if isAwayWatching, !away, let since = standingSince, now - since >= AwayTiming.standingDelay {
+            enterAway()
+        }
+        let target = away ? 1.0 : 0.0
+        let step = dt / AwayTiming.fadeDuration
+        awayCoverage = awayCoverage < target ? min(target, awayCoverage + step) : max(target, awayCoverage - step)
+    }
+
+    private func enterAway() {
+        away = true
+        standingSince = nil
+        captureStatus = "자리 비움 · 전체 블러 · 다시 앉으면 돌아옴"
     }
 
     private func renderPreview() {
@@ -391,6 +510,7 @@ final class AppModel: ObservableObject {
         connectionWidth = stored.connectionWidth
         responseTime = stored.responseTime
         retainBlurOnInputLoss = stored.retainBlurOnInputLoss
+        hideWhenAway = stored.hideWhenAway
         armLengthCM = stored.armLengthCM
         armGuide = stored.armGuide.guide
     }
@@ -401,6 +521,7 @@ final class AppModel: ObservableObject {
         memory.saveSettings(StoredSettings(startAngle: startAngle, maximumBlur: maximumBlur,
                                            connectionWidth: connectionWidth, responseTime: responseTime,
                                            retainBlurOnInputLoss: retainBlurOnInputLoss,
+                                           hideWhenAway: hideWhenAway,
                                            armLengthCM: armLengthCM, armGuide: StoredGuide(armGuide)))
     }
 

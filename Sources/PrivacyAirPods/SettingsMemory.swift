@@ -51,6 +51,8 @@ struct StoredSettings: Codable, Equatable {
     var connectionWidth: Double
     var responseTime: Double
     var retainBlurOnInputLoss: Bool
+    /// 자리를 뜨면 가리기 스위치. 이 키가 없는 이전 형식은 기본값 켜짐으로 읽음.
+    var hideWhenAway: Bool
     var armLengthCM: Double
     var armGuide: StoredGuide
 
@@ -68,6 +70,21 @@ struct StoredSettings: Codable, Equatable {
     /// NaN은 범위 어디에도 속하지 않으므로 하한으로 보냄.
     private static func clamp(_ value: Double, _ range: ClosedRange<Double>) -> Double {
         value.isNaN ? range.lowerBound : min(max(value, range.lowerBound), range.upperBound)
+    }
+}
+
+// 확장에 둬서 memberwise init을 유지함. hideWhenAway만 없어도 되게 읽고 나머지는 이전과 같이 필수로 읽음.
+extension StoredSettings {
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        startAngle = try container.decode(Double.self, forKey: .startAngle)
+        maximumBlur = try container.decode(Double.self, forKey: .maximumBlur)
+        connectionWidth = try container.decode(Double.self, forKey: .connectionWidth)
+        responseTime = try container.decode(Double.self, forKey: .responseTime)
+        retainBlurOnInputLoss = try container.decode(Bool.self, forKey: .retainBlurOnInputLoss)
+        hideWhenAway = try container.decodeIfPresent(Bool.self, forKey: .hideWhenAway) ?? true
+        armLengthCM = try container.decode(Double.self, forKey: .armLengthCM)
+        armGuide = try container.decode(StoredGuide.self, forKey: .armGuide)
     }
 }
 

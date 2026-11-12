@@ -208,6 +208,10 @@ private struct StatusHero: View {
                 Button(guarded ? "보호 끄기" : "보호 켜기") { model.toggleProtection() }
                     .buttonStyle(CheekyButtonStyle(variant: guarded ? .plain : .cocoa, size: .large))
                     .disabled(!guarded && !model.canProtect)
+                if model.away {
+                    Button("보호 재개") { model.resumeProtection() }
+                        .buttonStyle(CheekyButtonStyle(variant: .cocoa, size: .large))
+                }
                 if remaining > 0 && !guarded {
                     Button("준비 \(remaining)개 남음") { showReady() }
                         .buttonStyle(.plain)
@@ -238,6 +242,7 @@ private struct StatusHero: View {
     private var title: String {
         if model.startingProtection { return "준비 중" }
         guard model.protected else { return "보호 꺼짐" }
+        if model.away { return "자리 비움" }
         return model.suspended ? "전체를 가리는 중" : "보호 중"
     }
 }

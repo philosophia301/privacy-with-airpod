@@ -22,6 +22,26 @@ final class FakeHeadMotion: HeadMotionSource {
     func fail(_ message: String) { onError?(message) }
 }
 
+/// 걷기 활동 대역. 실제 CMHeadphoneActivityManager는 시작하지 않고, 시작된 동안에만 활동을 전달함.
+@MainActor
+final class FakeHeadActivity: HeadActivitySource {
+    var onActivity: ((HeadActivity) -> Void)?
+    private(set) var running = false
+
+    func start() { running = true }
+    func stop() { running = false }
+
+    func send(_ activity: HeadActivity) {
+        guard running else { return }
+        onActivity?(activity)
+    }
+
+    /// 멈추기 전에 이미 대기 중이던 callback이 늦게 도착한 경우. 모델의 가드만으로 걸러지는지 볼 때 씀.
+    func sendLate(_ activity: HeadActivity) {
+        onActivity?(activity)
+    }
+}
+
 /// 테스트가 직접 진행하는 시계. advance 한 번이 실제 앱의 갱신 주기 한 번에 해당함.
 @MainActor
 final class ManualClock: FrameClock {
@@ -49,11 +69,12 @@ final class ScreenList {
 }
 
 /// 실제 AppModel, ScreenCover, WindowServer 가림 창을 주 화면 하나에서 실행함.
-/// 대역은 AirPods 입력, 시계, 시스템 알림, 화면 목록, 테스트 전용 기억 suite뿐임.
+/// 대역은 AirPods 입력, AirPods 걷기 활동, 시계, 시스템 알림, 화면 목록, 테스트 전용 기억 suite뿐임.
 /// 기억 suite는 하네스마다 따로 만들고 tearDown에서 지워 다른 테스트나 UserDefaults.standard와 섞이지 않게 함.
 @MainActor
 final class ProtectionHarness {
     let motion = FakeHeadMotion()
+    let activity = FakeHeadActivity()
     let clock = ManualClock()
     let screens: ScreenList
     let display: DisplayCalibration
@@ -80,7 +101,7 @@ final class ProtectionHarness {
         defaults = try #require(UserDefaults(suiteName: suiteName))
         memory = SettingsMemory(defaults: defaults)
         screens = ScreenList([real])
-        model = Self.makeModel(motion: motion, clock: clock, screens: screens,
+        model = Self.makeModel(motion: motion, clock: clock, screens: screens, activity: activity,
                                notifications: notifications, workspace: workspace, memory: memory)
     }
 
@@ -94,7 +115,7 @@ final class ProtectionHarness {
         if let displays { screens.displays = displays }
         notifications = NotificationCenter()
         workspace = NotificationCenter()
-        model = Self.makeModel(motion: motion, clock: clock, screens: screens,
+        model = Self.makeModel(motion: motion, clock: clock, screens: screens, activity: activity,
                                notifications: notifications, workspace: workspace, memory: memory)
         return model
     }
@@ -123,6 +144,20 @@ final class ProtectionHarness {
     func look(right degrees: Double, source: Int = 1, measuredAgo age: TimeInterval = 0) {
         motion.send(HeadSample(timestamp: clock.now - age, receivedAt: clock.now, yaw: -degrees,
                                acceleration: .zero, gravity: SIMD3(0, 0, -1), source: source))
+    }
+
+    /// 정면을 보는 채 머리 높이를 meters만큼 seconds 동안 바꾸는 동작을 갱신 주기마다 보냄. 음수면 내려감.
+    /// 높이 h(1-cos(πt/T))/2의 2차 미분을 사용자 가속도로 보내, 적분한 높이 변화가 실제 경로와 같게 함.
+    func rise(by meters: Double, over seconds: Double) {
+        let omega = Double.pi / seconds
+        for step in 0...Int((seconds / 0.05).rounded()) {
+            let t = Double(step) * 0.05
+            let upward = 0.5 * meters * omega * omega * cos(omega * t)
+            motion.send(HeadSample(timestamp: clock.now, receivedAt: clock.now, yaw: 0,
+                                   acceleration: SIMD3(0, 0, upward / 9.80665), gravity: SIMD3(0, 0, -1),
+                                   source: 1))
+            clock.advance()
+        }
     }
 
     /// 같은 방향을 유지하며 갱신 주기마다 sample을 받음. 2초면 기본 전환 시간(0.18초) 평활화가 수렴함.
@@ -156,9 +191,11 @@ final class ProtectionHarness {
     }
 
     private static func makeModel(motion: FakeHeadMotion, clock: ManualClock, screens: ScreenList,
+                                  activity: FakeHeadActivity,
                                   notifications: NotificationCenter, workspace: NotificationCenter,
                                   memory: SettingsMemory) -> AppModel {
         AppModel(motion: motion, clock: clock, connectedDisplays: { [screens] in screens.displays },
-                 notifications: notifications, workspaceNotifications: workspace, memory: memory)
+                 notifications: notifications, workspaceNotifications: workspace,
+                 activity: activity, memory: memory)
     }
 }
