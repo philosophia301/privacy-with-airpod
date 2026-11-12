@@ -1,6 +1,6 @@
 import PrivacyCore
 
-/// 한 화면의 가로 위치별 블러 강도 규칙과 반경. 실제 보호, 설정 미리보기, 3D 장면이 같은 값을 사용함.
+/// 한 화면의 가로 위치별 블러 강도 규칙과 반경. 실제 보호, 설정 미리보기, 배치 지도가 같은 값을 사용함.
 struct RenderSettings: Sendable, Equatable {
     enum Field: Sendable, Equatable {
         /// 보정 전, 입력 중단, 출력 오류처럼 위치와 무관하게 모두 가림.

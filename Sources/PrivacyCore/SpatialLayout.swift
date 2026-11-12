@@ -78,7 +78,7 @@ public struct CompiledDisplayAngles: Sendable, Equatable {
     }
 }
 
-/// 여러 화면의 각도표와 전체 시야 폭. 실제 보호와 3D 미리보기가 같은 전환 폭을 쓰도록 한 곳에서 계산함.
+/// 여러 화면의 각도표와 전체 시야 폭. 실제 보호와 배치 지도가 같은 전환 폭을 쓰도록 한 곳에서 계산함.
 public struct CompiledLayout: Sendable, Equatable {
     public let displays: [UInt32: CompiledDisplayAngles]
     /// 모든 화면을 합친 좌우 시야 폭(도)임. 전환 폭 비율의 기준임.

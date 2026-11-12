@@ -23,17 +23,17 @@ ad-hoc 서명은 빌드 내용에 따라 권한 식별 조건이 달라질 수 �
 ## 조작과 복구
 
 ```text
-AirPods 입력 자동 시작 → 책상 정면 보정 → 3D 배치 맞추기와 적용 → 미리보기와 좌우 방향 확인 → 실제 화면 회전 블러 켜기 → 메뉴나 설정 창에서 보호 끄기
+AirPods 입력 자동 시작 → 책상 정면 보정 → 배치 수정 시트에서 배치 맞추기와 적용 → 미리보기와 좌우 방향 확인 → 실제 화면 회전 블러 켜기 → 메뉴나 설정 창에서 보호 끄기
 ```
 
 1. 수동 미리보기는 앱이 그린 예제 화면만 바꾸며 실제 화면의 보호 입력으로 쓰이지 않음.
 2. AirPods 입력은 앱 실행 시 자동으로 시작함. 첫 실행에 동작 접근 권한 창이 뜰 수 있음. 거절·미지원·끊김은 상태에 표시됨.
-3. 책상 정면을 보며 정면 맞추기를 한 번 누름. 3D 배치는 감지한 화면 크기를 초기값으로 쓰며 위치·거리·회전을 맞춘 뒤 적용함. 좌우 반전 토글은 없고 방향은 기존 기본값으로 고정됨. 고개를 오른쪽으로 돌렸을 때 보호가 맞는 쪽에 걸리는지 실물로 확인해야 함. 실제 방향 판정 전에는 효과의 정확성을 주장하지 않음.
+3. 책상 정면을 보며 정면 맞추기를 한 번 누름. 배치 수정 시트는 감지한 화면 크기를 초기값으로 쓰며 지도에서 위치·회전을, 옆 그림에서 높이를 맞춘 뒤 적용함. 좌우 반전 토글은 없고 방향은 기존 기본값으로 고정됨. 고개를 오른쪽으로 돌렸을 때 보호가 맞는 쪽에 걸리는지 실물로 확인해야 함. 실제 방향 판정 전에는 효과의 정확성을 주장하지 않음.
 4. 실제 화면 블러는 화면을 캡처하지 않고 WindowServer 합성 결과에 가변 블러 마스크만 적용함. 화면 기록 권한을 요청하지 않음.
 5. 가림 창은 메뉴 막대와 노치 좌우까지 덮고 클릭을 가로채지 않음. 펼친 메뉴와 보호 중인 설정 창은 가림 위에 표시됨.
 6. 메뉴나 설정 창의 보호 끄기 또는 앱 종료로 가림을 해제함. 입력 중단의 기본은 블러 해제이고, 옵션을 켜면 보호를 끌 때까지 전체 블러를 유지함. 화면 출력 실패는 검은 비상 가림을 유지하고 보호 끄기를 안내함. 최종 제품 복귀 정책은 spec의 미정 상태를 따름.
 
-화면 구성이 달라지면 보호를 끄고 정면 보정과 3D 배치를 다시 받음. 잠자기·출력 실패의 실제 화면 결과, Spaces·전체 화면과 메뉴 자동 숨김 조건은 각각 확인해야 함. 미검증 조합을 보호 완료라고 안내하지 않음.
+화면 구성이 달라지면 보호를 끄고 정면 보정과 배치 수정을 다시 받음. 잠자기·출력 실패의 실제 화면 결과, Spaces·전체 화면과 메뉴 자동 숨김 조건은 각각 확인해야 함. 미검증 조합을 보호 완료라고 안내하지 않음.
 
 ## 이동량·기립 실험
 
@@ -110,6 +110,8 @@ AppModel은 yaw를 한 번 필터링하고 모든 화면에 같은 값을 전달
 
 ## 3D 설정과 사전 각도표 — 같은 날 후속
 
+> 2026-11-12 이후 이 절의 SpatialSetupView, SpatialScene, SceneKit 설명은 이력임. 현재 배치 수정은 LayoutSheet, LayoutMap, LayoutEditor가 맡음(아래 배치 수정 화면 절 참고).
+
 SpatialSetupView는 적용 전 draft를 소유하고 SpatialScene은 설정창에서만 SceneKit 장면을 렌더링함. 위치나 각도를 변경하면 예제 텍스처와 모니터 자세를 갱신함. 일반 보호는 AppModel.applyLayout에서 만든 CompiledDisplayAngles 배열을 사용함. 실제 보호의 strength는 각도표 보간과 강도 연산만 하며 sin/cos/atan2는 호출하지 않음. 표 유효성도 생성 시 한 번 확인함. 설정창 해제 시 SCNView.scene을 제거하고 지속 재생은 켜지 않음.
 
 SceneKit은 [Apple에서 deprecated로 안내](https://developer.apple.com/documentation/scenekit/)하는 API임. 이번 설정 전용 PoC에서는 외부 자산·패키지 없이 카메라 조작과 화면 텍스처 검증을 빠르게 수행하기 위해 사용했음. 실제 보호 계산과 분리했으며 장기 제품화 시 RealityKit 교체를 검토함.
@@ -119,6 +121,8 @@ SceneKit은 [Apple에서 deprecated로 안내](https://developer.apple.com/docum
 실행 시 시스템에는 내장 화면 한 대가 활성화되어 있었으며 34.4×22.3cm 보고값을 UI와 3D 초기 크기에 반영한 것을 확인했음. 사람·팔 가이드·책상·화면 텍스처의 실제 3D 출력, 수동 +60°에서 방향선과 화면 블러 변화를 확인했음. 관측 사이 설정 sheet가 사라지고 window_not_found가 발생하여 이번 UI 자동화에서 ‘이 배치 적용’ 완료까지의 실물 검증은 남아 있음. applyLayout의 성공/실패와 설정 전달은 자동 검사로 확인했음. 외장 두 대의 3D 배치·AirPods 실물 연계·CPU/GPU 감소 수치는 미측정임.
 
 ## 3D 조작 피드백 — 같은 날 후속
+
+> 이 절의 SceneKit 조작 설명도 2026-11-12 이후 이력임.
 
 보기 전환은 SCNView.pointOfView와 defaultCameraController의 실제 표시 카메라를 함께 교체하고 관성을 멈춤. 자유 회전 뒤 남는 roll도 명시적인 위쪽 벡터로 초기화함. 같은 preset의 일반 갱신은 사용자의 관찰 시점을 다시 덮어쓰지 않음. 위치·높이·거리 슬라이더는 기존 수치 필드와 같은 draft에 연결함.
 
@@ -134,6 +138,8 @@ SceneKit은 [Apple에서 deprecated로 안내](https://developer.apple.com/docum
 전체 38개 검사(XCTest 6개 + Swift Testing 32개), 앱 빌드·엄격한 서명 검사를 통과했음. 추가 회귀 검사는 자유 회전 카메라에서 preset 복구, 화면 위쪽 방향 초기화, 같은 preset 갱신의 자유 회전 보존을 확인함. 실제 UI에서 여성 53.0cm 초기값, 남성 58.2cm 및 모형 변화, 정면·위쪽 보기 전환과 수평 복구, 좌우 슬라이더 0→1cm 수치 반영을 확인했음. 후속 높이·거리 조작은 창을 찾지 못하여 UI 확인을 완료하지 못했음. 현재 내장 화면 한 대에서의 확인이며 외장 두 대·실물 AirPods 보호 검증은 이번 범위에서 수행하지 않았음.
 
 ## 3D 눈 시점과 조작 간소화 — 같은 날 후속
+
+> 이 절의 SceneKit 설명과 선택 검증도 2026-11-12 이후 이력임.
 
 정면 카메라를 계산 기준인 눈 원점에 두고 고개 yaw를 반영함. 눈 시점에서는 머리와 방향선을 숨겨 화면을 가리지 않게 함. 입체·위쪽 카메라의 거리와 화각을 줄였으며 SCNView 자유 조작을 껐음. 사람 노드 회전에 팔·손도 함께 따라감. 설정의 수치 필드를 제거하고 크기·위치 슬라이더와 가로/세로 전환 버튼을 제공함. 전환은 기존 draft 치수를 교환해 적용 시 각도표에도 반영되며 시스템 화면 회전을 요청하지 않음.
 
@@ -341,7 +347,7 @@ codesign --verify --strict --verbose=2 '.build/distribution/20260914-171706/Priv
 
 fixture 두 개 종료 뒤 build-app.sh로 제품 복원·strict 서명 확인, 제품 PID 35504로 실행함. computer-use로 ‘효과 농도’와 캡처 없음 안내, 보호 꺼짐·보정 전·배치 적용 전·내장 1대 상태를 확인함. AirPods 입력 시작을 눌렀으나 ‘동작 입력을 기다리는 중’으로 실제 수신·고개 회전은 미검증임. 특정 window-id 조회 한 번은 실패했으며 restore-window 조회로 살아 있는 동일 앱을 확인함. 새 충돌로 판정하지 않음.
 
-실제 검증의 다음 행동은 AirPods 착용 → 책상 정면 보정 → 3D 배치 적용 → 실제 보호 켜기임. 후보 외형과 전환의 사용자 확인 뒤에 acceptance를 갱신함.
+실제 검증의 다음 행동은 AirPods 착용 → 책상 정면 보정 → 배치 수정 적용 → 실제 보호 켜기임. 후보 외형과 전환의 사용자 확인 뒤에 acceptance를 갱신함.
 
 
 ## 미리보기만 적용되는 듯 보인다는 후속 — 2026-09-14
@@ -677,3 +683,47 @@ Bagel Fat One은 `Resources/Fonts/BagelFatOne-Regular.ttf`에서 번들 `Content
 - 실제 AirPods로 상태 카드의 포즈(`lost`, `think`, `relax`, `cheer`, `guard`) 전환과 자동 시작을 확인하지 않음. 캡처한 개발 빌드는 AirPods 입력이 없는 상태였음.
 - 창은 라이트 모양으로 고정함. 시스템 다크 모드에서도 고정되는지는 확인 전임.
 - 보호 중 상태 카드(노랑 바탕과 체커 띠)와 VoiceOver 읽기 순서는 화면으로 확인하지 않음.
+
+## 배치 수정 화면 — 2026-11-12
+
+사용자 결정은 [spec](spec.md#배치-수정-화면--2026-11-12-사용자-결정)이 소유함. 배치 수정 시트는 Design 캔버스의 배치 안 2를 따르며, 설정 창의 3D 장면(`SpatialSetupView.swift`, `SpatialScene.swift`)과 그 테스트를 대체함.
+
+### 구성
+
+| 경로 | 역할 |
+| --- | --- |
+| `Sources/PrivacyAirPods/Settings/LayoutSheet.swift` | 600 폭 배치 시트. 헤더, 지도 카드, 팔 길이 칩, 선택 패널, 고개 확인 줄, 취소와 적용을 맡음 |
+| `Sources/PrivacyAirPods/Settings/LayoutMap.swift` | 위에서 본 지도(`TopLayoutMap`)와 옆에서 본 높이 그림(`SideHeightView`)을 그리고, 끌기와 키보드 입력을 편집 상태에 전달함 |
+| `Sources/PrivacyAirPods/Settings/LayoutEditor.swift` | 배치 편집 상태, 좌표 변환, 끌기와 키보드 규칙, 흐림 강도 조회를 맡음. SwiftUI 뷰를 가지지 않음 |
+| `Tests/PrivacyAppTests/LayoutEditingFlowTests.swift` | 지도 조작이 `AppModel`의 적용을 거쳐 실제 보호 경계를 바꾸는 e2e |
+
+### 좌표 규칙
+
+- 위에서 본 지도: 1cm가 1.85pt(`LayoutEditor.mapScale`)임. 머리 관측점은 지도 가로 가운데, 아래쪽에서 28pt 위에 놓임(`mapOrigin` 278, 328). 지도에서 위쪽이 앞(z)이고 오른쪽이 x임.
+- 옆에서 본 높이: 1cm가 0.8pt(`LayoutEditor.sideScale`)임. 눈 위치는 그림 왼쪽에서 16pt, 그림 위쪽에서 55pt 아래에 놓임(`sideOrigin`). 가로는 거리, 세로는 눈 기준 높이임.
+- 화면 위치와 모양은 `DisplayPose`의 cm 값에서 바로 계산하며, 오른쪽 끝은 (x + w/2 cos yaw, z - w/2 sin yaw)임.
+
+### 흐림 표시
+
+모니터 앞면 띠의 흐림은 `RenderSettings.spatial(...).strength(at:)`를 그대로 씀. `LayoutEditor.faceStrengths`가 이 호출만 감쌈. 시안의 그림과 흐림 규칙을 따로 계산하면 실제 보호와 어긋날 수 있어서 한 곳에서만 계산함.
+
+### 관찰 경계
+
+sample마다 바뀌는 고개 각도(`LiveReadout`)는 `TopLayoutMap`, `SideHeightView`, `GazeCheckRow`만 관찰함. 시트 본체 `body`는 readout 값을 읽지 않음. 이 경계는 `ProtectionFlowTests.steadyHeadInputRedrawsOnlyLiveReadoutNotWholeSettingsWindow` 계약과 같은 목적임.
+
+### 지도 표기
+
+- 화면 이름은 번호 badge 위에 둠. 1.85pt/cm 축척에서는 badge와 화면 사이가 좁아 이름이 화면 몸체와 겹침.
+- 거리 고리 숫자(50, 100, 150)는 고리 왼쪽 끝 아래, 머리 높이 줄 밑에 자처럼 둠. 가운데 위에 두면 고개 방향 선과 화면에 겹침.
+- 화면 메뉴의 label은 글자만 줌. AppKit 메뉴 단추는 label의 그림을 글자 앞에 놓으므로 펼침 표시는 시스템 것을 씀.
+
+### 검증 기록
+
+- 2026-11-12: `swift test --build-system native` 전체 통과(58개 테스트, 7개 suite, XCTest 6개), `./scripts/build-app.sh` 조립과 서명 통과.
+- 2026-11-12: 사용자 화면이 모두 전체 화면 Space라 개발 앱 창 캡처(`screencapture -l`, ScreenCaptureKit)가 실패했음. 저장소 밖 복사본에서 `NSHostingView`의 `cacheDisplay`로 시트를 화면에 띄우지 않고 그려 시안과 비교했음. 기본 배치와 돌린 배치 두 상태를 봄.
+
+### 남은 위험
+
+- 지도의 고개 표시는 실제 AirPods 입력으로 확인하지 않음.
+- 실제 창에서 끌기, 손잡이, 키보드, VoiceOver 조작은 사람 확인이 남음. 자동 검증은 `LayoutEditor` 경로와 e2e까지임.
+- 옆 그림과 위에서 본 지도의 실제 크기 감각은 실물 모니터 기준으로 확인하지 않음.

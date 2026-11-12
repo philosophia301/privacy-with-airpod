@@ -93,11 +93,30 @@ extension View {
 
 enum CheekySize {
     case regular
+    case medium
     case large
 
-    var height: CGFloat { self == .large ? 46 : 30 }
-    var padding: CGFloat { self == .large ? 22 : 14 }
-    var fontSize: CGFloat { self == .large ? 15 : 13 }
+    var height: CGFloat {
+        switch self {
+        case .regular: return 30
+        case .medium: return 36
+        case .large: return 46
+        }
+    }
+    var padding: CGFloat {
+        switch self {
+        case .regular: return 14
+        case .medium: return 18
+        case .large: return 22
+        }
+    }
+    var fontSize: CGFloat {
+        switch self {
+        case .regular: return 13
+        case .medium: return 14
+        case .large: return 15
+        }
+    }
 }
 
 enum CheekyButtonVariant {
@@ -304,5 +323,71 @@ struct CheckerBand: View {
         .frame(height: height)
         .clipped()
         .accessibilityHidden(true)
+    }
+}
+
+// 노랑 캡슐 값 배지. 앞말과 숫자와 단위를 나눠 쓰며 숫자는 display, 한글 단위는 text 글꼴을 씀.
+struct CheekyValueBadge: View {
+    var prefix = ""
+    var number = ""
+    var unit = ""
+    var background = CheekyPalette.yellow
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            if !prefix.isEmpty {
+                Text(prefix)
+                    .font(CheekyFont.text(12, weight: .bold))
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                if !number.isEmpty {
+                    Text(number)
+                        .font(CheekyFont.display(13))
+                }
+                if !unit.isEmpty {
+                    Text(unit)
+                        .font(CheekyFont.text(12, weight: .bold))
+                }
+            }
+        }
+        .foregroundStyle(CheekyPalette.ink)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 2)
+        .background(Capsule().fill(background))
+        .overlay(Capsule().stroke(CheekyPalette.cocoa, lineWidth: 2))
+        .fixedSize()
+    }
+}
+
+// 캡슐 묶음 안의 선택 칸. 고른 칸만 노랑으로 채우고 사용할 수 없으면 흐리게 함.
+struct CheekySegmentButton: View {
+    let title: String
+    let selected: Bool
+    var enabled = true
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(CheekyFont.text(13, weight: selected ? .bold : .medium))
+                .foregroundStyle(CheekyPalette.ink)
+                .padding(.horizontal, 14)
+                .frame(height: 26)
+                .background(Capsule().fill(selected ? CheekyPalette.yellow : Color.clear))
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.5)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+extension View {
+    // CheekySegmentButton을 담는 크림 캡슐 틀. 안쪽 2pt 여백과 cocoa 테두리를 씀.
+    func cheekySegmentGroup() -> some View {
+        padding(2)
+            .background(Capsule().fill(CheekyPalette.cream))
+            .overlay(Capsule().stroke(CheekyPalette.cocoa, lineWidth: 2))
+            .fixedSize()
     }
 }

@@ -30,32 +30,14 @@ private struct PreviewModePill: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            segment("AirPods", selected: !model.demo, enabled: model.deskReference != nil) {
+            CheekySegmentButton(title: "AirPods", selected: !model.demo, enabled: model.deskReference != nil) {
                 model.demo = false
             }
-            segment("직접 돌려보기", selected: model.demo, enabled: true) {
+            CheekySegmentButton(title: "직접 돌려보기", selected: model.demo) {
                 model.demo = true
             }
         }
-        .padding(2)
-        .background(Capsule().fill(CheekyPalette.cream))
-        .overlay(Capsule().stroke(CheekyPalette.cocoa, lineWidth: 2))
-        .fixedSize()
-    }
-
-    private func segment(_ title: String, selected: Bool, enabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(CheekyFont.text(13, weight: selected ? .bold : .medium))
-                .foregroundStyle(CheekyPalette.ink)
-                .padding(.horizontal, 14)
-                .frame(height: 26)
-                .background(Capsule().fill(selected ? CheekyPalette.yellow : Color.clear))
-        }
-        .buttonStyle(.plain)
-        .disabled(!enabled)
-        .opacity(enabled ? 1 : 0.5)
-        .accessibilityAddTraits(selected ? .isSelected : [])
+        .cheekySegmentGroup()
     }
 }
 
@@ -188,32 +170,10 @@ private struct TuningSlider: View {
                     .font(CheekyFont.text(14, weight: .semibold))
                     .help(Text(help ?? ""))
                 Spacer(minLength: 8)
-                ValueBadge(number: format(value), unit: unit)
+                CheekyValueBadge(number: format(value), unit: unit)
             }
             FinSlider(value: $value, range: range, step: step, label: title,
                       valueText: { format($0) + unit })
         }
-    }
-}
-
-private struct ValueBadge: View {
-    let number: String
-    let unit: String
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 2) {
-            Text(number)
-                .font(CheekyFont.display(14))
-            if !unit.isEmpty {
-                Text(unit)
-                    .font(CheekyFont.text(12, weight: .bold))
-            }
-        }
-        .foregroundStyle(CheekyPalette.ink)
-        .padding(.horizontal, 9)
-        .padding(.vertical, 2)
-        .background(Capsule().fill(CheekyPalette.yellow))
-        .overlay(Capsule().stroke(CheekyPalette.cocoa, lineWidth: 2))
-        .fixedSize()
     }
 }

@@ -32,7 +32,7 @@ struct SettingsView: View {
         .background(CheekyPalette.cream)
         .preferredColorScheme(.light)
         .modifier(RequiredUpdateGate(state: update, protecting: model.protected || model.startingProtection))
-        .sheet(isPresented: $showingLayout) { SpatialSetupView(model: model, update: update) }
+        .sheet(isPresented: $showingLayout) { LayoutSheet(model: model, update: update) }
         .task(id: cheerToken) { await holdCheer(token: cheerToken) }
     }
 

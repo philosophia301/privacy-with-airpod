@@ -18,7 +18,7 @@ enum DisplayLayout {
         let frame: CGRect
     }
 
-    /// 시스템이 알 수 없는 물리 보정값의 초기값(cm). 사용자는 3D 설정에서 바꿈.
+    /// 시스템이 알 수 없는 물리 보정값의 초기값(cm). 사용자는 배치 시트에서 바꿈.
     static let defaultGap = 0.0
     static let defaultViewingDistance = 60.0
 
@@ -103,7 +103,7 @@ enum DisplayLayout {
         }
     }
 
-    /// 왼쪽, 같은 열이면 위쪽, 그다음 ID 순서임. 화면 목록과 3D 배치가 같은 순서를 씀.
+    /// 왼쪽, 같은 열이면 위쪽, 그다음 ID 순서임. 화면 목록과 배치 지도가 같은 순서를 씀.
     private static func leftToRight(_ a: (id: CGDirectDisplayID, frame: CGRect),
                                     _ b: (id: CGDirectDisplayID, frame: CGRect)) -> Bool {
         if a.frame.midX != b.frame.midX { return a.frame.midX < b.frame.midX }

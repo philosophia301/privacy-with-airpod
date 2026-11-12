@@ -1,7 +1,7 @@
 import AppKit
 import CoreImage
 
-/// 설정 미리보기와 3D 장면에 쓰는 앱 자체 예제 화면. 실제 화면 내용은 사용하지 않음.
+/// 설정 미리보기에만 쓰는 앱 자체 예제 화면. 실제 화면 내용은 사용하지 않음.
 enum ExampleScreen {
     @MainActor static func make() -> CIImage {
         let size = NSSize(width: 800, height: 420)
