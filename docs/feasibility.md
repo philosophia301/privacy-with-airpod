@@ -55,6 +55,10 @@ Apple의 [Core Motion 안내](https://developer.apple.com/videos/play/wwdc2023/1
 
 추천 실험은 고정된 출발점에서 자리 고침·기립·걸어 나감·중간 정지·복귀를 구별하고 사람이 확인한 실제 동작과 입력을 대조하는 것임. 짧은 구간의 위치 추정 후보가 있으면 같은 입력에서 비교함. 부드러운 전환 성공과 실제 위치 감지 성공을 별도로 보고함. 센서 추가·카메라 사용·위치 비례 제품 채택은 승인 전임.
 
+### 걷기 감지 API — 2026-11-12 확인
+
+이 Mac의 macOS 27 SDK에 `CMHeadphoneActivityManager`가 있으며 `API_AVAILABLE(macos(15.0))`임. 지원 헤드폰의 `CMMotionActivity`(stationary, walking, running, 신뢰도)를 받고, 헤더 설명상 자동차와 자전거는 지원하지 않음. 연결 상태(connected, disconnected) 갱신도 따로 받을 수 있음. 앱 최소 지원 버전(macOS 15)과 맞음. 터미널에서 실행한 확인 코드에서 `isActivityAvailable`과 `isStatusAvailable`이 true, 권한 상태가 허용(3)이었음. 실제 걷기 판정의 지연과 정확도, 앉아서 머리를 흔드는 동작의 오판은 실측 전임.
+
 ## 단위 1 실험안 — 승인 전
 
 | 실험 | 입력과 관측 | 종료 시 판정 |
