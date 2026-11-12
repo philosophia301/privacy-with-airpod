@@ -9,7 +9,7 @@
 
 - [x] 구현: `SeatPresence`, `HeadActivityService`, `AppModel` 자리 비움과 복귀, 가리기 탭 스위치, '보호 재개' 단추와 메뉴, `settings.v1`의 `hideWhenAway`.
 - [x] e2e와 판정 시험: `SeatAwayFlowTests`, `SeatPresenceTests`, `HeadActivityServiceTests`. 결함 주입으로 실패함을 확인함.
-- [ ] 결정: 일어선 상태나 자리 비움 중 AirPods를 빼면 어떻게 할지(현재는 'AirPods를 벗으면' 설정을 따라 기본은 흐림 풀기).
+- [x] 결정과 구현(2026-11-13): 일어선 뒤나 자리 비움 중 입력이 끊기면 설정과 상관없이 계속 가림. 보호를 꺼야 풀림.
 - [ ] 실측: 기록 도구를 만들어 AirPods로 일어서기, 앉기, 자세 고침, 숙이기, 걷기, 걷다 바로 앉기를 측정하고 기준값을 조정함. 실측 기록의 보관 방식은 그때 사용자 결정.
 - [ ] 실제 AirPods로 자리 비움, 자동 복귀, 걷기 판정 지연을 사람 확인.
 
