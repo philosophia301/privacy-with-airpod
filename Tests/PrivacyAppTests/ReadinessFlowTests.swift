@@ -1,3 +1,4 @@
+import AppKit
 import Testing
 import PrivacyCore
 @testable import PrivacyAirPods
@@ -71,6 +72,29 @@ struct ReadinessFlowTests {
         #expect(items[0].why == "AirPods를 껴 주세요")
         #expect(items[1].why == "AirPods가 연결되면 맞출 수 있어요")
         #expect(h.model.heroMood == .lost)
+    }
+
+    @Test func losingDeskReferenceReturnsHidePreviewFromAirPodsToManual() throws {
+        let h = try ProtectionHarness()
+        defer { h.model.stopProtection() }
+        h.model.startMotion()
+        h.look(right: 0)
+        #expect(h.model.calibrateDesk())
+        #expect(!h.model.demo)
+
+        // AirPods를 빼 sample이 끊기면 정면 기준이 사라짐. AirPods 보기는 고를 수 없으므로 직접 돌려보기로 돌아옴.
+        for _ in 0..<16 { h.clock.advance() }
+        #expect(h.model.deskReference == nil)
+        #expect(h.model.demo)
+
+        // 다시 맞춘 뒤 화면 구성이 바뀌어도 같은 규칙을 따르고, 메뉴 상태 문구는 다시 맞출 것을 알림.
+        h.hold(right: 0, for: 0.2)
+        #expect(h.model.calibrateDesk())
+        #expect(!h.model.demo)
+        h.notifications.post(name: NSApplication.didChangeScreenParametersNotification, object: nil)
+        #expect(h.model.deskReference == nil)
+        #expect(h.model.demo)
+        #expect(h.model.captureStatus == "화면 구성이 바뀜 · 정면과 배치를 다시 맞춰 주세요")
     }
 
     @Test func deniedMotionAccessAsksForSystemSettingsInsteadOfWearing() throws {

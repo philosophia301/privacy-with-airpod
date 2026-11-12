@@ -677,6 +677,7 @@ Bagel Fat One은 `Resources/Fonts/BagelFatOne-Regular.ttf`에서 번들 `Content
 - `swift test --filter ReadinessFlowTests`: 준비 항목의 완료, 할 일, 기다림 상태가 실제 설정 흐름에서 나오는지 확인함. 2026-11-12 전체 `swift test`에서 Swift Testing 앱 45개, Core 11개, XCTest 6개가 통과함.
 - `./scripts/build-app.sh`로 조립하고 설정 창을 `screencapture -l`로 캡처해 시안 2-2와 비교함. 2026-11-12 내장 화면에서 준비 탭(AirPods 할 일, 책상 정면 기다림, 화면 할 일)과 가리기 탭(직접 돌려보기, 고개 0°)을 확인함. 가리기 탭은 확인을 위해 시작 탭만 바꾼 임시 빌드로 캡처했고 소스는 되돌렸음.
 - 시안과 다른 점: 미리보기는 시안의 그림 대신 기존 예제 화면을 실제로 흐린 결과임. 화면이 두 대 이상이면 미리볼 화면 메뉴가 붙음. 직접 돌려보기의 고개 범위는 기존과 같은 -90°~90°임.
+- 2026-11-12 후속 수정: 입력 중단이나 화면 구성 변경으로 정면 기준(`deskReference`)이 사라지면 `AppModel`이 가리기 탭을 직접 돌려보기로 돌려놓음. 전에는 고를 수 없는 AirPods 보기에 남아 미리보기가 전체 블러로 멈추고 고개 슬라이더가 잠겼음. `ReadinessFlowTests.losingDeskReferenceReturnsHidePreviewFromAirPodsToManual`이 두 경로를 검사하며, 수정 전 코드에서 3건 실패를 확인했음. 같은 수정에서 메뉴 상태 문구의 '실험을 중지함'을 '화면 구성이 바뀜 · 정면과 배치를 다시 맞춰 주세요'로 바꿈.
 
 ### 남은 확인
 

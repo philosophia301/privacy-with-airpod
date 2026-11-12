@@ -41,7 +41,11 @@ final class AppModel: ObservableObject {
     @Published var responseTime = 0.18
     @Published var connectionWidth = 25.0
     @Published var startAngle = 35.0
-    @Published private(set) var deskReference: Double?
+    @Published private(set) var deskReference: Double? {
+        // AirPods 보기는 정면 기준이 있어야 고를 수 있음. 기준이 사라졌는데 그 보기에 남으면
+        // 미리보기는 전체 블러로 멈추고 고개 슬라이더는 잠기므로 직접 돌려보기로 돌려놓음.
+        didSet { if deskReference == nil && !demo { demo = true } }
+    }
     @Published private(set) var appliedPoses: [DisplayPose] = []
     /// 마지막 입력 오류가 동작 접근 거절인지 나타냄. 거절 문구 비교는 `invalidateMotion` 한 곳에서만 함.
     @Published private(set) var motionAccessDenied = false
@@ -342,7 +346,7 @@ final class AppModel: ObservableObject {
         appliedPoses = []
         appliedLayout = nil
         refreshDisplays()
-        captureStatus = "화면 구성이 달라져 실험을 중지함 — 다시 보정해 주세요"
+        captureStatus = "화면 구성이 바뀜 · 정면과 배치를 다시 맞춰 주세요"
     }
 
     @objc private func willSleep() {
