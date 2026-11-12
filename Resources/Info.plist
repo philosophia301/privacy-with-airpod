@@ -1,19 +1,36 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-<key>CFBundleDevelopmentRegion</key><string>ko</string>
-<key>CFBundleExecutable</key><string>PrivacyAirPods</string>
-<key>CFBundleIconFile</key><string>AppIcon</string>
-<key>CFBundleIdentifier</key><string>io.enjoy301.PrivacyAirPods</string>
-<key>CFBundleName</key><string>Privacy AirPods</string>
-<key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.1.4</string>
-<key>CFBundleVersion</key><string>5</string>
-<key>LSMinimumSystemVersion</key><string>15.0</string>
-<key>NSMotionUsageDescription</key><string>고개 방향에 따라 화면을 흐리게 하고 자리 이탈 실험을 위해 AirPods 움직임을 사용합니다.</string>
-<key>NSPrincipalClass</key><string>NSApplication</string>
-<key>NSHighResolutionCapable</key><true/>
-<key>SUFeedURL</key><string>https://raw.githubusercontent.com/philosophia301/privacy-with-airpod/main/appcast.xml</string>
-<key>SUPublicEDKey</key><string>1H9M8qzGlyp+eqmmS2hC1wvRgkSDoz4vdP4brGNcsZA=</string>
-<key>SUEnableAutomaticChecks</key><true/>
-</dict></plist>
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>ko</string>
+	<key>CFBundleExecutable</key>
+	<string>PrivacyAirPods</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>io.enjoy301.PrivacyAirPods</string>
+	<key>CFBundleName</key>
+	<string>Privacy AirPods</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.5</string>
+	<key>CFBundleVersion</key>
+	<string>6</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>15.0</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSMotionUsageDescription</key>
+	<string>고개 방향에 따라 화면을 흐리게 하고 자리 이탈 실험을 위해 AirPods 움직임을 사용합니다.</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://raw.githubusercontent.com/philosophia301/privacy-with-airpod/main/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>1H9M8qzGlyp+eqmmS2hC1wvRgkSDoz4vdP4brGNcsZA=</string>
+</dict>
+</plist>
