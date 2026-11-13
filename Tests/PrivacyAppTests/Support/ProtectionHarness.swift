@@ -148,13 +148,28 @@ final class ProtectionHarness {
 
     /// 정면을 보는 채 머리 높이를 meters만큼 seconds 동안 바꾸는 동작을 갱신 주기마다 보냄. 음수면 내려감.
     /// 높이 h(1-cos(πt/T))/2의 2차 미분을 사용자 가속도로 보내, 적분한 높이 변화가 실제 경로와 같게 함.
-    func rise(by meters: Double, over seconds: Double) {
+    /// step은 갱신 주기마다 sample을 보내고 시계를 진행한 뒤 호출됨. 주기마다 상태를 기록할 때 씀.
+    func rise(by meters: Double, over seconds: Double, after step: (() -> Void)? = nil) {
         let omega = Double.pi / seconds
-        for step in 0...Int((seconds / 0.05).rounded()) {
-            let t = Double(step) * 0.05
+        for index in 0...Int((seconds / 0.05).rounded()) {
+            let t = Double(index) * 0.05
             let upward = 0.5 * meters * omega * omega * cos(omega * t)
             motion.send(HeadSample(timestamp: clock.now, receivedAt: clock.now, yaw: 0,
                                    // Core Motion 관례대로 위로 가속하면 사용자 가속도가 중력과 같은 쪽을 가리킴.
+                                   acceleration: SIMD3(0, 0, -upward / 9.80665), gravity: SIMD3(0, 0, -1),
+                                   source: 1))
+            clock.advance()
+            step?()
+        }
+    }
+
+    /// 걷기 동작을 갱신 주기마다 보냄. 한 걸음은 0.5초이고, 걸음의 4·5번째 sample이 위로 +5m/s²를 보내며
+    /// 나머지 여덟 sample은 -1.25m/s²를 보냄. 한 걸음의 평균이 0이라 높이가 남지 않음.
+    func walk(for seconds: TimeInterval) {
+        for index in 0..<Int((seconds / 0.05).rounded()) {
+            let heelStrike = index % 10 == 4 || index % 10 == 5
+            let upward = heelStrike ? 5.0 : -1.25
+            motion.send(HeadSample(timestamp: clock.now, receivedAt: clock.now, yaw: 0,
                                    acceleration: SIMD3(0, 0, -upward / 9.80665), gravity: SIMD3(0, 0, -1),
                                    source: 1))
             clock.advance()

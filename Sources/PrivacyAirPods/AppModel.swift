@@ -90,9 +90,10 @@ final class AppModel: ObservableObject {
     /// 다시 착용한 뒤 입력이 또 끊겨도 이 값이 남아 있어야 두 번째 중단에서 설정대로 풀리지 않음.
     private var retainingForLeave = false
     private var previewWindowVisible = false
-    /// 머리 자세로 일어섬과 앉음을 판정함. 보호가 시작될 때마다 앉은 상태에서 다시 시작함.
+    /// 머리 움직임 모양으로 일어섬과 앉음을 판정함. 보호가 시작될 때마다 앉은 상태에서 다시 시작함.
     private var presence = SeatPresence()
     /// 일어선 시각. 이 시각부터 `AwayTiming.standingDelay`가 지나면 자리 비움으로 봄. 앉거나 자리 비움이면 nil.
+    /// 앉는 후보가 확인되는 동안에는 자리 비움을 미뤄, 3초 안에 다시 앉은 사용자를 잠깐이라도 가리지 않음.
     private var standingSince: TimeInterval?
     /// 고개 따라가기(0)와 최대 블러(1) 사이의 가림 정도. 자리 비움 전환을 한 번에 바꾸지 않으려고 씀.
     private var awayCoverage = 0.0
@@ -103,7 +104,8 @@ final class AppModel: ObservableObject {
         previewWindowVisible || receiving || protected || startingProtection
     }
 
-    /// 자리 이탈 판정의 시간 기준. 실측 전 임시값이며 조정할 때 여기만 바꿈.
+    /// 자리 비움 판정의 시간 기준. 3초·0.5초·3초는 승인된 행동값임.
+    /// 일어섬과 앉음의 머리 움직임 기준은 `SeatPresence.Tuning`이 실제 기록 두 개로 고른 값이며 여기서 다루지 않음.
     private enum AwayTiming {
         /// 일어선 뒤 다시 앉지 않고 머무는 시간. 초 단위임.
         static let standingDelay: TimeInterval = 3
@@ -446,8 +448,10 @@ final class AppModel: ObservableObject {
     }
 
     /// 일어선 채 기준 시간이 지나면 자리 비움으로 보고, 가림 정도를 매 주기 목표 쪽으로 조금씩 옮김.
+    /// 앉는 후보가 확인 중이면 기준 시간이 지나도 자리 비움으로 보지 않음. 확인이 끝나면 앉음이거나 일어선 상태가 남음.
     private func advanceAway(dt: Double, now: TimeInterval) {
-        if isAwayWatching, !away, let since = standingSince, now - since >= AwayTiming.standingDelay {
+        if isAwayWatching, !away, !presence.isConfirmingSit,
+           let since = standingSince, now - since >= AwayTiming.standingDelay {
             enterAway()
         }
         let target = away ? 1.0 : 0.0

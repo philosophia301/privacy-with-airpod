@@ -5,14 +5,38 @@ import PrivacyCore
 
 /// 자리 이탈 가리기의 사용자 흐름 e2e. 실제 AppModel과 WindowServer 가림 창의 마스크를 관측함.
 /// AirPods 동작·걷기 활동과 시계만 대역이며, 실제 일어서기 감지 품질이나 실제 자리 비움은 증명하지 않음.
-/// 시간 기대값은 일어선 시각에서 3초와 0.5초 전환으로 정하며 판정 알고리즘을 복사하지 않음.
+/// 시간 기대값은 일어섬 동작 구간과 승인된 3초·0.5초 전환에서 정하며 판정 알고리즘의 내부 시각을 복사하지 않음.
+/// 보호 시작 직후 1.5초는 감지가 입력을 무시하므로 자세를 바꾸는 모든 흐름은 보호 뒤 2초 쉰 뒤 시작함.
 @MainActor
 @Suite(.serialized)
 struct SeatAwayFlowTests {
-    /// 보호 중 일어선 뒤 3초가 지나 자리 비움이 되고, 가림이 최대가 될 때까지 기다린 상태를 만듦.
+    /// 흐름 중 자리 비움이 한 번이라도 됐는지 갱신 주기마다 기록함. 자리 비움이 잠깐 켜졌다 꺼져도 잡으려고 씀.
+    @MainActor
+    private final class AwayWatch {
+        private let harness: ProtectionHarness
+        private(set) var everAway = false
+
+        init(_ harness: ProtectionHarness) {
+            self.harness = harness
+        }
+
+        func note() {
+            everAway = everAway || harness.model.away
+        }
+
+        /// 정면을 보는 채 seconds만큼 갱신하며 매 주기 기록함.
+        func hold(for seconds: TimeInterval) {
+            for _ in 0..<Int((seconds / 0.05).rounded()) {
+                harness.hold(right: 0, for: 0.05)
+                note()
+            }
+        }
+    }
+
+    /// 보호 중 2초 쉬고 일어선 뒤 3초가 지나 자리 비움이 되고, 가림이 최대가 될 때까지 기다린 상태를 만듦.
     private func standUpAndWalkAway(_ h: ProtectionHarness) async throws -> NSPanel {
         let panel = try await h.protect()
-        h.hold(right: 0, for: 1)
+        h.hold(right: 0, for: 2)
         h.rise(by: 0.45, over: 1.2)
         h.hold(right: 0, for: 5)
         #expect(h.model.away)
@@ -20,20 +44,29 @@ struct SeatAwayFlowTests {
         return panel
     }
 
+    /// 일어섬 동작이 시작한 뒤 3초가 지나기 전에는 자리 비움이 아니고, 3초 뒤 동작 구간 안에서 자리 비움이 됨.
+    /// 일어섬은 동작 초반에 보고되므로 자리 비움 시각은 동작 시작 뒤 3초보다 늦고 동작 끝 뒤 3.1초보다 이름.
     @Test func standingUpCoversTheWholeScreenOnlyAfterThreeSeconds() async throws {
         let h = try ProtectionHarness()
         defer { h.tearDown() }
         let panel = try await h.protect()
-        h.hold(right: 0, for: 1)
+        h.hold(right: 0, for: 2)
+        let riseStart = h.clock.now
         h.rise(by: 0.45, over: 1.2)
-        // 동작이 끝난 지 2.9초면 일어섬 확정(약 0.3초) 뒤 3초가 아직 지나지 않음.
-        h.hold(right: 0, for: 2.9)
-        #expect(try h.maskAlpha(panel) == [0, 0, 0])
+        let riseEnd = riseStart + 1.2
+        // rise가 끝난 시각은 동작 시작 1.25초 뒤이므로 여기서 1.65초 더 쉬면 동작 시작 2.9초 시점임.
+        h.hold(right: 0, for: 1.65)
         #expect(!h.model.away)
+        #expect(try h.maskAlpha(panel) == [0, 0, 0])
 
-        // 3.4초면 확정 뒤 3초를 넘김.
-        h.hold(right: 0, for: 0.5)
+        var waited = 0.0
+        while !h.model.away && waited < 8 {
+            h.hold(right: 0, for: 0.05)
+            waited += 0.05
+        }
+        let awayAt = h.clock.now
         #expect(h.model.away)
+        #expect(awayAt >= riseStart + 3.0 && awayAt <= riseEnd + 3.1)
         #expect(h.model.captureStatus.contains("자리 비움"))
         // 판정 직후에는 0.5초에 걸쳐 옮겨 가므로 가운데가 아직 최대가 아님.
         let middle = try h.maskAlpha(panel)[1]
@@ -47,13 +80,14 @@ struct SeatAwayFlowTests {
         let h = try ProtectionHarness()
         defer { h.tearDown() }
         let panel = try await h.protect()
-        h.hold(right: 0, for: 1)
+        h.hold(right: 0, for: 2)
         h.activity.send(.moving)
         h.hold(right: 0, for: 0.6)
         #expect(h.model.away)
 
         h.rise(by: -0.45, over: 1.2)
-        h.hold(right: 0, for: 0.5)
+        // 앉음 확인이 동작 끝 근처에 끝나므로 확인 시간을 넉넉히 기다린 뒤 판정함.
+        h.hold(right: 0, for: 1.5)
         #expect(!h.model.away)
         // 앉은 뒤 늦게 온 걷기 callback은 무시돼야 함. 앉은 사용자는 다시 내려앉을 수 없음.
         h.activity.send(.moving)
@@ -62,17 +96,28 @@ struct SeatAwayFlowTests {
         #expect(try h.maskAlpha(panel) == [0, 0, 0])
     }
 
+    /// 일어섰다가 3초 안에 다시 앉는 동작 동안 자리 비움이 한 번도 되지 않아야 함.
+    /// 앉음 확인이 늦게 끝나는 동안 자리 비움 타이머가 멈춰 있어야 통과함.
     @Test func sittingDownWithinThreeSecondsDoesNotCover() async throws {
         let h = try ProtectionHarness()
         defer { h.tearDown() }
         let panel = try await h.protect()
-        h.hold(right: 0, for: 1)
+        h.hold(right: 0, for: 2)
         h.rise(by: 0.45, over: 1.2)
         h.hold(right: 0, for: 1)
-        // 앉는 동작이 3초 안에 나와 자리 비움 기록을 지움. 이후 4초 동안 가리지 않아야 함.
-        h.rise(by: -0.45, over: 1.2)
-        h.hold(right: 0, for: 4)
+
+        let watch = AwayWatch(h)
+        var everCovered = false
+        // 앉는 동작 시작부터 끝까지 매 주기 자리 비움과 가림을 기록함. 마스크를 읽지 못해도 가린 것으로 봄.
+        h.rise(by: -0.45, over: 1.2) {
+            watch.note()
+            everCovered = everCovered || (try? h.maskAlpha(panel)) != [0, 0, 0]
+        }
+        watch.hold(for: 4)
+
+        #expect(!watch.everAway)
         #expect(!h.model.away)
+        #expect(!everCovered)
         #expect(try h.maskAlpha(panel) == [0, 0, 0])
     }
 
@@ -93,7 +138,7 @@ struct SeatAwayFlowTests {
         let h = try ProtectionHarness()
         defer { h.tearDown() }
         let panel = try await h.protect()
-        h.hold(right: 0, for: 1)
+        h.hold(right: 0, for: 2)
         // 일어서기 판정을 기다리지 않고 걷기만으로 자리 비움이 됨.
         h.activity.send(.moving)
         h.hold(right: 0, for: 0.6)
@@ -107,13 +152,44 @@ struct SeatAwayFlowTests {
         #expect(try h.maskAlpha(panel) == [0, 0, 0])
     }
 
+    /// 걸어서 나갔다가 멈추지 않고 걷는 채 다시 앉으면 돌아옴. 걷는 동안의 걸음 신호가 자리 비움을 풀지 않아야 함.
+    @Test func walkingBackAndSittingWithoutStoppingReturns() async throws {
+        let h = try ProtectionHarness()
+        defer { h.tearDown() }
+        let panel = try await h.protect()
+        h.hold(right: 0, for: 1)
+        h.activity.send(.moving)
+        h.hold(right: 0, for: 0.6)
+        #expect(h.model.away)
+
+        h.walk(for: 3)
+        h.rise(by: -0.45, over: 1.2)
+        h.hold(right: 0, for: 2)
+        #expect(!h.model.away)
+        #expect(h.model.captureStatus == "보호 중")
+        #expect(try h.maskAlpha(panel) == [0, 0, 0])
+    }
+
+    /// 걸어서 자리 비움이 된 뒤 멈추지 않고 걷다 그대로 멈추면 앉지 않았으므로 계속 가림.
+    @Test func walkingAwayAndStoppingWithoutSittingStaysCovered() async throws {
+        let h = try ProtectionHarness()
+        defer { h.tearDown() }
+        let panel = try await h.protect()
+        h.hold(right: 0, for: 1)
+        h.activity.send(.moving)
+        h.walk(for: 6)
+        h.hold(right: 0, for: 4)
+        #expect(h.model.away)
+        #expect(try h.maskAlpha(panel) == [255, 255, 255])
+    }
+
     @Test func switchOffNeverCoversOnStandingOrWalking() async throws {
         let h = try ProtectionHarness()
         defer { h.tearDown() }
         h.model.hideWhenAway = false
         let panel = try await h.protect()
         #expect(!h.activity.running)
-        h.hold(right: 0, for: 1)
+        h.hold(right: 0, for: 2)
         h.rise(by: 0.45, over: 1.2)
         h.hold(right: 0, for: 4)
         h.activity.sendLate(.moving)
@@ -157,7 +233,7 @@ struct SeatAwayFlowTests {
         defer { h.tearDown() }
         h.model.retainBlurOnInputLoss = true
         let panel = try await h.protect()
-        h.hold(right: 0, for: 1)
+        h.hold(right: 0, for: 2)
         h.activity.send(.moving)
         h.hold(right: 0, for: 0.6)
         #expect(h.model.away)
@@ -214,7 +290,7 @@ struct SeatAwayFlowTests {
         defer { h.tearDown() }
         #expect(!h.model.retainBlurOnInputLoss)
         let panel = try await h.protect()
-        h.hold(right: 0, for: 1)
+        h.hold(right: 0, for: 2)
         switch leaving {
         case .standing:
             h.rise(by: 0.45, over: 1.2)
@@ -278,7 +354,7 @@ struct SeatAwayFlowTests {
         let h = try ProtectionHarness()
         defer { h.tearDown() }
         let panel = try await h.protect()
-        h.hold(right: 0, for: 1)
+        h.hold(right: 0, for: 2)
         h.rise(by: 0.45, over: 1.2)
         h.hold(right: 0, for: 1)
         h.rise(by: -0.45, over: 1.2)
@@ -295,7 +371,7 @@ struct SeatAwayFlowTests {
         defer { h.tearDown() }
         h.model.hideWhenAway = false
         let panel = try await h.protect()
-        h.hold(right: 0, for: 1)
+        h.hold(right: 0, for: 2)
         h.rise(by: 0.45, over: 1.2)
         h.hold(right: 0, for: 1)
 
@@ -320,20 +396,24 @@ struct SeatAwayFlowTests {
         #expect(h.model.protectionWindows.isEmpty)
     }
 
+    /// 앉은 채 작은 머리 조정과 자세 고침을 해도 자리 비움이 되지 않음.
+    /// 0.1m를 1초에 올렸다 1초에 내리는 조정은 실측 앉은 상태의 최대 속도보다 낮은 동작임.
     @Test func bendingAndAdjustingWhileSeatedDoesNotCover() async throws {
         let h = try ProtectionHarness()
         defer { h.tearDown() }
         let panel = try await h.protect()
-        h.hold(right: 0, for: 1)
+        h.hold(right: 0, for: 2)
+        let watch = AwayWatch(h)
         // 앉은 채 0.1m 들어 올렸다 내리고, 0.3m 숙였다 펴는 자세 고침은 자리 이탈이 아님.
-        h.rise(by: 0.1, over: 0.5)
-        h.hold(right: 0, for: 0.5)
-        h.rise(by: -0.1, over: 0.5)
-        h.hold(right: 0, for: 0.5)
-        h.rise(by: -0.3, over: 1.2)
-        h.hold(right: 0, for: 1)
-        h.rise(by: 0.3, over: 1.2)
-        h.hold(right: 0, for: 4)
+        h.rise(by: 0.1, over: 1.0, after: watch.note)
+        watch.hold(for: 0.5)
+        h.rise(by: -0.1, over: 1.0, after: watch.note)
+        watch.hold(for: 0.5)
+        h.rise(by: -0.3, over: 1.2, after: watch.note)
+        watch.hold(for: 1)
+        h.rise(by: 0.3, over: 1.2, after: watch.note)
+        watch.hold(for: 4)
+        #expect(!watch.everAway)
         #expect(!h.model.away)
         #expect(try h.maskAlpha(panel) == [0, 0, 0])
     }
@@ -342,7 +422,7 @@ struct SeatAwayFlowTests {
         let h = try ProtectionHarness()
         defer { h.tearDown() }
         let panel = try await h.protect()
-        h.hold(right: 0, for: 1)
+        h.hold(right: 0, for: 2)
         h.rise(by: 0.45, over: 1.2)
         var waited = 0.0
         while !h.model.away && waited < 8 {
