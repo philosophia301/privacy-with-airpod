@@ -139,8 +139,8 @@ struct AwayRule {
 
     private(set) var presence: SeatPresence
     private(set) var away = false
-    /// 마지막 움직임 표본을 넣은 직후의 level임. 앉아서 돌아올 때 앱 규칙이 level을 0으로 되돌리기 전 값이라 실제 높이 변화를 잴 때 씀.
-    private(set) var measuredLevel = 0.0
+    /// 마지막 움직임 표본을 넣은 직후의 위쪽 속도 추정치임. m/s 단위이며 앉아서 돌아올 때도 값을 그대로 둬 실제 움직임 속도를 잴 때 씀.
+    private(set) var measuredVelocity = 0.0
     let timing: Timing
     private var standingSince: Double?
     private var movingIgnoredUntil = -Double.infinity
@@ -152,8 +152,9 @@ struct AwayRule {
     }
 
     /// 앱의 매 주기 확인에 해당함. 기록 행마다 부르므로 판정 시각 오차는 표본 간격 이내임.
+    /// 앉음 후보가 확인 중이면 기준 시간이 지나도 자리 비움으로 보지 않음. AppModel.advanceAway와 같은 규칙임.
     mutating func advance(to now: Double) -> Change? {
-        guard !away, let since = standingSince, now - since >= timing.standingDelay else { return nil }
+        guard !away, !presence.isConfirmingSit, let since = standingSince, now - since >= timing.standingDelay else { return nil }
         enterAway()
         return .away(walking: false)
     }
@@ -161,7 +162,7 @@ struct AwayRule {
     mutating func motion(now: Double, timestamp: Double, acceleration: SIMD3<Double>, gravity: SIMD3<Double>) -> [Change] {
         var changes = advance(to: now).map { [$0] } ?? []
         let event = presence.ingest(timestamp: timestamp, acceleration: acceleration, gravity: gravity)
-        measuredLevel = presence.level
+        measuredVelocity = presence.velocity
         switch event {
         case .stoodUp:
             changes.append(.stoodUp)
@@ -225,7 +226,7 @@ enum StepVerdict: String, Codable {
 
 struct StepEvent: Codable, Equatable {
     let kind: String
-    /// 단계 시작부터 지난 초임. 안내를 듣고 움직이기까지의 반응 시간을 포함함.
+    /// 단계 시작(안내 음성이 시작된 때)부터 지난 초임. 음성 길이와 움직이기까지의 반응 시간을 포함함.
     let at: Double
 }
 
@@ -238,11 +239,9 @@ struct StepReport: Codable {
     let awayAfter: Double?
     /// 단계 시작부터 자리 비움이 풀리기까지의 초임.
     let backAfter: Double?
-    /// 앉은 자세 기준 머리 높이 추정치의 단계 안 최고, 최저임. m 단위임.
-    let maxLevel: Double?
-    let minLevel: Double?
-    /// 움직임 구간이 끝날 때 반영된 높이 변화임. m 단위이며 0.5cm 미만은 뺌.
-    let heightChanges: [Double]
+    /// 단계 안에서 본 위쪽 속도 추정치의 최고, 최저임. m/s 단위이며 위쪽이 양수임. 움직임 표본이 없으면 nil임.
+    let maxVelocity: Double?
+    let minVelocity: Double?
     let events: [StepEvent]
     let motionSamples: Int
 }
@@ -251,7 +250,7 @@ struct DataQuality: Codable {
     let motionSamples: Int
     let seconds: Double
     let rate: Double
-    /// SeatPresence가 구간을 버리는 간격(maximumGap)을 넘은 표본 간격 수임.
+    /// 받은 시각 기준으로 0.5초(maximumGap) 넘게 벌어진 표본 간격 수임. SeatPresence는 센서 시각 간격으로 따로 판정하므로 전달 지연 점검용 근사임.
     let gaps: Int
     let longestGap: Double
     let activityRows: Int
@@ -286,9 +285,8 @@ struct SeatAnalyzer {
         let awayAtStart: Bool
         var firstAway: Double?
         var firstBack: Double?
-        var maxLevel: Double?
-        var minLevel: Double?
-        var heightChanges: [Double] = []
+        var maxVelocity: Double?
+        var minVelocity: Double?
         var events: [StepEvent] = []
         var motionSamples = 0
     }
@@ -315,8 +313,8 @@ struct SeatAnalyzer {
     }
 
     var away: Bool { rule.away }
-    /// 마지막 움직임 표본 직후의 높이 추정치임. 앱 규칙이 되돌리기 전 값임.
-    var measuredLevel: Double { rule.measuredLevel }
+    /// 마지막 움직임 표본 직후의 위쪽 속도 추정치임.
+    var measuredVelocity: Double { rule.measuredVelocity }
 
     mutating func handle(_ row: RecordedRow) -> [Note] {
         switch row {
@@ -337,15 +335,12 @@ struct SeatAnalyzer {
                 return []
             }
             lastTimestamp = t
-            let before = rule.presence.level
             let changes = rule.motion(now: rx, timestamp: t, acceleration: acceleration, gravity: gravity)
-            let measured = rule.measuredLevel
-            // 구간 끝에서만 level이 크게 바뀜. 정지 중 되돌림은 표본당 1mm 미만이라 0.5cm 기준으로 가름.
+            let velocity = rule.measuredVelocity
             if var current = open {
-                if abs(measured - before) >= 0.005 { current.heightChanges.append(measured - before) }
                 current.motionSamples += 1
-                current.maxLevel = max(current.maxLevel ?? measured, measured)
-                current.minLevel = min(current.minLevel ?? measured, measured)
+                current.maxVelocity = max(current.maxVelocity ?? velocity, velocity)
+                current.minVelocity = min(current.minVelocity ?? velocity, velocity)
                 open = current
             }
             return record(changes, at: rx)
@@ -436,13 +431,15 @@ struct SeatAnalyzer {
         }
         reports.append(StepReport(id: step.id, expectation: step.expectation, seconds: end - step.start,
                                   verdict: verdict, awayAfter: step.firstAway, backAfter: step.firstBack,
-                                  maxLevel: step.maxLevel, minLevel: step.minLevel,
-                                  heightChanges: step.heightChanges, events: step.events,
-                                  motionSamples: step.motionSamples))
+                                  maxVelocity: step.maxVelocity, minVelocity: step.minVelocity,
+                                  events: step.events, motionSamples: step.motionSamples))
     }
 
     static func describe(_ tuning: SeatPresence.Tuning) -> [String: Double] {
-        Dictionary(uniqueKeysWithValues: TuningFlag.all.map { ($0.name, tuning[keyPath: $0.path]) })
+        var values = Dictionary(uniqueKeysWithValues: TuningFlag.all.map { ($0.name, tuning[keyPath: $0.path]) })
+        values["walkingSteps"] = Double(tuning.walkingSteps)
+        values["confirmationSteps"] = Double(tuning.confirmationSteps)
+        return values
     }
 }
 
@@ -452,16 +449,22 @@ struct TuningFlag {
     let name: String
     let path: WritableKeyPath<SeatPresence.Tuning, Double>
 
+    /// Double 기준값 전부임. 정수 기준(walkingSteps, confirmationSteps)은 명령행으로 바꾸지 않고 describe에서만 보고함.
     static var all: [TuningFlag] {
-        [TuningFlag(flag: "--still-acceleration", name: "stillAcceleration", path: \.stillAcceleration),
-         TuningFlag(flag: "--still-duration", name: "stillDuration", path: \.stillDuration),
-         TuningFlag(flag: "--max-segment", name: "maximumSegment", path: \.maximumSegment),
-         TuningFlag(flag: "--max-gap", name: "maximumGap", path: \.maximumGap),
-         TuningFlag(flag: "--stand-level", name: "standLevel", path: \.standLevel),
-         TuningFlag(flag: "--sit-level", name: "sitLevel", path: \.sitLevel),
-         TuningFlag(flag: "--settled-velocity", name: "settledVelocity", path: \.settledVelocity),
-         TuningFlag(flag: "--forced-still", name: "forcedStillDuration", path: \.forcedStillDuration),
-         TuningFlag(flag: "--relax-time", name: "relaxTime", path: \.relaxTime)]
+        [TuningFlag(flag: "--velocity-memory", name: "velocityMemory", path: \.velocityMemory),
+         TuningFlag(flag: "--stand-speed", name: "standSpeed", path: \.standSpeed),
+         TuningFlag(flag: "--sit-speed", name: "sitSpeed", path: \.sitSpeed),
+         TuningFlag(flag: "--pairing", name: "pairing", path: \.pairing),
+         TuningFlag(flag: "--pairing-memory", name: "pairingMemory", path: \.pairingMemory),
+         TuningFlag(flag: "--refractory", name: "refractory", path: \.refractory),
+         TuningFlag(flag: "--sit-confirmation", name: "sitConfirmation", path: \.sitConfirmation),
+         TuningFlag(flag: "--step-acceleration", name: "stepAcceleration", path: \.stepAcceleration),
+         TuningFlag(flag: "--step-debounce", name: "stepDebounce", path: \.stepDebounce),
+         TuningFlag(flag: "--step-interval-min", name: "stepIntervalMin", path: \.stepIntervalMin),
+         TuningFlag(flag: "--step-interval-max", name: "stepIntervalMax", path: \.stepIntervalMax),
+         TuningFlag(flag: "--after-walking-window", name: "afterWalkingWindow", path: \.afterWalkingWindow),
+         TuningFlag(flag: "--after-walking-factor", name: "afterWalkingFactor", path: \.afterWalkingFactor),
+         TuningFlag(flag: "--max-gap", name: "maximumGap", path: \.maximumGap)]
     }
 }
 
@@ -485,10 +488,9 @@ enum ReportText {
             if let away = step.awayAfter { head += ", 비움까지 \(fixed(away, 1))초" }
             if let back = step.backAfter { head += ", 복귀까지 \(fixed(back, 1))초" }
             lines.append(head + ")")
-            let level = step.maxLevel.map { "높이 최고 \(centimeters($0)) 최저 \(centimeters(step.minLevel ?? $0))" } ?? "움직임 표본 없음"
-            let changes = step.heightChanges.isEmpty ? "" : ", 구간 변화 " + step.heightChanges.map(centimeters).joined(separator: " ")
+            let speed = step.maxVelocity.map { "속도 최고 \(velocity($0)) 최저 \(velocity(step.minVelocity ?? $0))" } ?? "움직임 표본 없음"
             let events = step.events.isEmpty ? "" : " | " + step.events.map { "\($0.kind) \(fixed($0.at, 1))초" }.joined(separator: ", ")
-            lines.append("    \(level)\(changes)\(events)")
+            lines.append("    \(speed)\(events)")
         }
         lines.append("")
         let order: [StepVerdict] = [.ok, .missed, .falseCover, .stuck, .notApplicable]
@@ -505,8 +507,8 @@ enum ReportText {
         String(format: "%.\(digits)f", value)
     }
 
-    static func centimeters(_ meters: Double) -> String {
-        let value = Int((meters * 100).rounded())
-        return value > 0 ? "+\(value)cm" : "\(value)cm"
+    /// 위쪽 양수 속도를 부호와 함께 소수 둘째 자리로 씀. 예: +0.52m/s
+    static func velocity(_ metersPerSecond: Double) -> String {
+        String(format: "%+.2fm/s", metersPerSecond)
     }
 }

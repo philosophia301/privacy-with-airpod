@@ -210,23 +210,25 @@ reference는 같은 화면 구성·배율·블러 설정에서 얻은 기준 출
 
 ## 자리 이탈 실측 기록
 
-`SeatRecorder.swift`(명령행과 AirPods 기록), `SeatRecording.swift`(기록 형식, 앱 규칙 재현, 보고), `SeatProtocol.swift`(측정 순서와 합성 기록)는 자리 이탈 판정 기준을 실제 AirPods로 재는 명령행 도구임. 제품 앱과 별도이며 제품 설정을 읽거나 쓰지 않음. 판정 방식과 임시 기준값은 [개발 안내](../../docs/development.md#자리-이탈-감지--2026-11-12)가 소유함.
+`SeatRecorder.swift`(명령행과 AirPods 기록), `SeatRecording.swift`(기록 형식, 앱 규칙 재현, 보고), `SeatProtocol.swift`(측정 순서와 합성 기록)는 자리 이탈 판정 기준을 실제 AirPods로 재는 명령행 도구임. 제품 앱과 별도이며 제품 설정을 읽거나 쓰지 않음. 판정 방식과 기준값은 [개발 안내](../../docs/development.md#자리-이탈-감지--2026-11-12)가 소유함.
 
 빌드는 `.build/signing-identity`의 개발 서명을 씀(설정은 [개발 안내](../../docs/development.md) 앞부분). `--no-sign`은 서명 없이 만들며 replay와 시험에만 씀.
 
 ```sh
 python3 scripts/diagnostics/build-seat-recorder.py
 .build/seat-recorder/seat-recorder record --out /tmp/seat-새이름.csv
-.build/seat-recorder/seat-recorder record --quick --out /tmp/seat-새이름2.csv
-.build/seat-recorder/seat-recorder replay /tmp/seat-새이름.csv --stand-level 0.2
+.build/seat-recorder/seat-recorder record --check --out /tmp/seat-새이름3.csv
+.build/seat-recorder/seat-recorder replay /tmp/seat-새이름.csv --stand-speed 0.3
 ```
 
-- `record`: AirPods를 끼고 앉은 채 실행함. 한국어 안내 음성(`--no-voice`면 화면만)에 따라 가만히 앉기, 타자, 일어서기와 앉기 반복(`--repeat`, 기본 3), 자세 고침, 숙이기, 걸어갔다 돌아오기, 걷다 바로 앉기를 약 4분 동안 함. `--quick`은 가만히 앉기, 일어서기와 앉기 반복, 걷다 바로 앉기 2회만 하며 약 3분임. 단계 시간은 안내 음성이 끝난 뒤부터 세고, 음성이 10초 안에 끝나지 않으면 기다리지 않음. 단계마다 판정 사건을 바로 보여 주고 끝나면 단계별 보고를 냄. 기록은 1초마다 파일에 써서, Ctrl+C나 창 닫기, kill로 멈춰도 그때까지 기록이 남고 보고도 냄(강제 종료는 보고 없이 기록만 남음).
+- `record`: AirPods를 끼고 앉은 채 실행함. 한국어 안내 음성(`--no-voice`면 화면만)에 따라 가만히 앉기, 타자, 일어서기와 앉기 반복(`--repeat`, 기본 3), 자세 고침, 숙이기, 걸어갔다 돌아오기, 걷다 바로 앉기를 약 4분 동안 함. `--quick`은 가만히 앉기, 일어서기와 앉기 반복, 걷다 바로 앉기 2회만 하며 약 3분임.
+- `record --check`: 3차 확인 기록임. 기준값은 고정한 채 판정만 다시 확인함. 앉은 채 몸을 숙이고 기지개를 켜는 동작, 2초 안에 일어섰다 앉기 두 번, 반쯤 일어섰다 앉기 두 번(평가 안 함), 걷다 바로 앉기 두 번과 걷다 멈춰 앉기, 걷다 멈춘 뒤 고개를 들거나 숙인 채 서 있다가 돌아와 앉기, 천천히 일어서고 앉기를 약 4분 동안 함. 순서는 `SeatProtocol.swift`의 `check()`가 정하며 `--quick`, `--repeat`와 함께 쓰면 종료 코드 64로 거부함. 단계 시간은 안내 음성이 끝난 뒤부터 세고, 음성이 10초 안에 끝나지 않으면 기다리지 않음. 단계마다 판정 사건을 바로 보여 주고 끝나면 단계별 보고를 냄. 기록은 1초마다 파일에 써서, Ctrl+C나 창 닫기, kill로 멈춰도 그때까지 기록이 남고 보고도 냄(강제 종료는 보고 없이 기록만 남음).
 - 기록 파일은 `--out`으로 지정한 새 파일에만 씀. 이미 있는 파일은 덮어쓰지 않고 소유자만 읽게(0600) 만듦. AirPods 입력이 `--wait`초(기본 20) 안에 오지 않으면 파일을 만들지 않고 종료 코드 69로 끝남. 처음 실행의 동작 접근 허용 창이 떠 있는 동안은 기다린 시간에 넣지 않고, 거절하면 종료 코드 77로 끝남.
 - 기록에는 표본마다 받은 시각, 센서 시각, 사용자 가속도와 중력(g 단위), 센서 위치, 걷기 판정 항목과 신뢰도, 단계 시작 표시가 들어감. 머리 방향(yaw)과 화면 내용은 쓰지 않음. 원시 움직임 값이므로 실제 기록 전에 보관 방식(예: 분석 뒤 바로 지움)을 사용자가 정함([판단 규칙](../../docs/rules/spec-decisions.md)). 도구는 파일을 지우지 않으므로 정한 방식대로 직접 처리함.
 - `replay`: 기록을 `SeatPresence`와 앱의 자리 비움 규칙으로 다시 돌림. `SeatPresence.Tuning`의 모든 값과 `--standing-delay`, `--return-settle`을 인자로 바꿔 볼 수 있고 `--json`은 기계 처리용 보고를 냄.
-- 보고: 단계마다 기대(앉은 채 유지, 자리 비움, 다시 앉음, 비움 뒤 앉음)와 판정(맞음, 놓침, 잘못 가림, 못 돌아옴, 해당 없음), 자리 비움과 복귀까지 걸린 시간, 높이 추정치의 최고와 최저, 움직임 구간마다 반영된 높이 변화, 일어섬, 앉음, 걷기 판정 시각을 보임. 시간은 단계 시작(안내 음성이 끝난 때)부터 재므로 안내를 듣고 움직이기까지의 반응 시간을 포함함.
-- 앱 규칙 재현(`AwayRule`)은 `AppModel`의 `receiveActivity`, `trackPosture`, `advanceAway`, `resumeProtection`과 `AwayTiming` 값을 옮긴 것임. 앱 규칙을 바꾸면 이 도구도 함께 고침. 보호와 스위치는 늘 켜진 것으로 보고, 앱의 매 화면 주기 확인은 기록 행마다(약 40ms) 확인하는 것으로 근사함. `AppModel.receive`처럼 센서 시각이 앞서지 않는 표본은 버림. 이어버드가 바뀐 표본과 0.75초 넘게 늦은 표본은 앱이라면 입력 중단이지만 replay는 판정을 이어가고 보고의 '입력 주의'에 횟수만 보임. 가림 전환(0.5초), 입력 중단 유지, 화면 구성 변경은 재현하지 않음.
-- `synth`(`--quick` 가능)는 측정 순서를 이상적인 움직임으로 흉내 낸 합성 기록을 만들고, `record --simulate`는 그 합성 입력을 실제 시간에 맞춰 기록 경로에 넣음. 합성 입력은 단계 시각이 정해져 있어 안내 음성을 기다리지 않음. 둘 다 AirPods 없이 형식과 보고를 점검하는 용도이며 실측을 대신하지 않음. 합성 기록에서 걷다 바로 앉기는 알려진 한계대로 '못 돌아옴'이 나옴.
+- `replay`: 기준값 인자(`--velocity-memory`, `--stand-speed`, `--sit-speed`, `--pairing`, `--pairing-memory`, `--refractory`, `--sit-confirmation`, `--step-acceleration`, `--step-debounce`, `--step-interval-min`, `--step-interval-max`, `--after-walking-window`, `--after-walking-factor`, `--max-gap`, `--standing-delay`, `--return-settle`)의 목록은 `seat-recorder help`가 보임. 짝 비율은 1 이하, 걸음 간격은 최소가 최대보다 작아야 함, 걷기 뒤 배율은 1 이상이어야 하며 나머지 Double 기준은 0보다 커야 함. 어기면 종료 코드 64로 거부함. 걸음 수와 확인 걸음 수(`walkingSteps`, `confirmationSteps`)는 명령행 인자가 없고 `--json`의 기준값에만 보임.
+- 보고: 단계마다 기대(앉은 채 유지, 자리 비움, 다시 앉음, 비움 뒤 앉음)와 판정(맞음, 놓침, 잘못 가림, 못 돌아옴, 해당 없음), 자리 비움과 복귀까지 걸린 시간, 단계 안의 위쪽 속도 추정치 최고와 최저(m/s, 위쪽 양수), 일어섬, 앉음, 걷기 판정 시각을 보임. 단계 구간은 안내 음성이 시작될 때 바뀌고 시간도 그때부터 재므로, 음성 길이와 움직이기까지의 반응 시간을 포함함. 2차 기록(2026-11-13)까지는 음성이 끝난 때 단계 행을 써서, 음성(약 4초) 중의 움직임이 앞 단계 사건으로 보고됨.
+- 앱 규칙 재현(`AwayRule`)은 `AppModel`의 `receiveActivity`, `trackPosture`, `advanceAway`, `resumeProtection`과 `AwayTiming` 값을 옮긴 것임. 앉음 후보가 확인 중이면 3초 타이머로 자리 비움을 만들지 않음. 앱 규칙을 바꾸면 이 도구도 함께 고침. 보호와 스위치는 늘 켜진 것으로 보고, 앱의 매 화면 주기 확인은 기록 행마다(약 40ms) 확인하는 것으로 근사함. `AppModel.receive`처럼 센서 시각이 앞서지 않는 표본은 버림. 이어버드가 바뀐 표본과 0.75초 넘게 늦은 표본은 앱이라면 입력 중단이지만 replay는 판정을 이어가고 보고의 '입력 주의'에 횟수만 보임. 가림 전환(0.5초), 입력 중단 유지, 화면 구성 변경은 재현하지 않음.
+- `synth`(`--quick` 또는 `--check` 가능)는 측정 순서를 이상적인 움직임으로 흉내 낸 합성 기록을 만들고, `record --simulate`는 그 합성 입력을 실제 시간에 맞춰 기록 경로에 넣음. 합성 입력은 단계 시각이 정해져 있어 안내 음성을 기다리지 않음. 둘 다 AirPods 없이 형식과 보고를 점검하는 용도이며 실측을 대신하지 않음. 기본 합성 기록은 맞음 13개임. `--check` 합성 기록은 천천히 앉기(`slow-sit`, 2.5초 동안 0.45m)에서 속도 최저가 -0.22m/s로 앉음 기준 0.22m/s 근처에 머물러 '못 돌아옴'이 나옴. 기준값은 바꾸지 않고 기록해 둔 판정이며 시험도 이 결과를 고정함.
 
-`test-seat-recorder.py`는 도구를 임시 폴더에 서명 없이 빌드해 합성 기록의 replay 판정, `--quick` 순서, 기준값 인자 반영, 앱이 쓰지 않을 입력의 집계, 덮어쓰기 거부, 잘못된 기록 거부를 확인함. `verify-diagnostics.py`가 함께 돌림.
+`test-seat-recorder.py`는 도구를 임시 폴더에 서명 없이 빌드해 합성 기록의 replay 판정, `--quick`과 `--check` 순서, `--check`와 `--quick`·`--repeat`의 조합 거부, 기준값 인자 반영, 앱이 쓰지 않을 입력의 집계, 덮어쓰기 거부, 잘못된 기록과 잘못된 기준값 거부를 확인함. `verify-diagnostics.py`가 함께 돌림.

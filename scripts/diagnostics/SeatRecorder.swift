@@ -9,9 +9,9 @@ import PrivacyCore
 @main
 struct SeatRecorderTool {
     static let usage = """
-    seat-recorder record --out 새파일.csv [--quick] [--repeat N] [--no-voice] [--wait 초] [--simulate]
+    seat-recorder record --out 새파일.csv [--quick | --check] [--repeat N] [--no-voice] [--wait 초] [--simulate]
     seat-recorder replay 기록.csv [--json] [기준값 인자]
-    seat-recorder synth --out 새파일.csv [--quick] [--repeat N]
+    seat-recorder synth --out 새파일.csv [--quick | --check] [--repeat N]
 
     기준값 인자: \(TuningFlag.all.map(\.flag).joined(separator: " ")) --standing-delay --return-settle
     """
@@ -47,12 +47,16 @@ struct SeatRecorderTool {
         for flag in TuningFlag.all {
             if let value = try arguments.number(flag.flag) { tuning[keyPath: flag.path] = value }
         }
-        // sitLevel만 음수를 허용함. 앉은 자세 기준보다 낮은 높이를 앉음 기준으로 잡는 실험이 가능해야 함.
-        for flag in TuningFlag.all where flag.name != "sitLevel" && tuning[keyPath: flag.path] <= 0 {
+        for flag in TuningFlag.all where tuning[keyPath: flag.path] <= 0 {
             throw ToolError(message: "\(flag.flag)는 0보다 커야 함", code: 64)
         }
-        guard tuning.standLevel > tuning.sitLevel else {
-            throw ToolError(message: "--stand-level은 --sit-level보다 커야 함", code: 64)
+        // 짝 비율, 걸음 간격, 걷기 뒤 배율은 판정 조건이 뒤집히는 값을 막음.
+        guard tuning.pairing <= 1 else { throw ToolError(message: "--pairing은 1 이하여야 함", code: 64) }
+        guard tuning.stepIntervalMin < tuning.stepIntervalMax else {
+            throw ToolError(message: "--step-interval-min은 --step-interval-max보다 작아야 함", code: 64)
+        }
+        guard tuning.afterWalkingFactor >= 1 else {
+            throw ToolError(message: "--after-walking-factor는 1 이상이어야 함", code: 64)
         }
         var timing = AwayRule.Timing()
         if let value = try arguments.number("--standing-delay") { timing.standingDelay = value }
@@ -143,8 +147,17 @@ struct Arguments {
     }
 
     /// --quick이면 앉은 채 유지, 일어서기와 앉기, 걷다 바로 앉기만 하는 짧은 순서를 씀.
+    /// --check이면 3차 확인 순서를 씀. 고정된 순서라 --quick, --repeat와 함께 쓰면 거부함.
     mutating func steps() throws -> [ProtocolStep] {
+        let check = flag("--check")
         let quick = flag("--quick")
+        let repeatGiven = items.contains("--repeat")
+        if check {
+            guard !quick, !repeatGiven else {
+                throw ToolError(message: "--check는 --quick, --repeat와 함께 쓸 수 없음", code: 64)
+            }
+            return ProtocolStep.check()
+        }
         let repeats = try repeats()
         return quick ? ProtocolStep.quick(repeats: repeats) : ProtocolStep.standard(repeats: repeats)
     }
@@ -237,7 +250,7 @@ final class Recorder {
     private var speaker: Process?
     /// 끝난 음성이 지금 음성인지 가리는 번호임. 앞 음성을 끊을 때 온 종료 알림을 무시함.
     private var speechToken = 0
-    /// 안내 음성이 끝나기를 기다리기 시작한 시각임. 단계 행과 단계 시간은 음성이 끝난 뒤부터임.
+    /// 안내 음성이 끝나기를 기다리기 시작한 시각임. 단계 행은 음성이 시작될 때 쓰고 단계 시간은 음성이 끝난 뒤부터 셈.
     private var speechWaitSince: Double?
     private var exitCode: Int32?
 
@@ -475,8 +488,11 @@ final class Recorder {
         }
         let step = steps[stepIndex]
         print("[\(stepIndex + 1)/\(steps.count)] \(step.id) \(Int(step.seconds))초: \(step.instruction)")
+        // 단계 행은 안내 음성이 시작될 때 씀. 사람은 음성을 듣는 중에 움직이기 시작함.
+        // 2차 실측에서 음성이 끝난 때 행을 쓰니 음성(약 4초) 중의 앉음이 앞 단계 사건으로 잡혔음.
+        append { .step(rx: $0, id: step.id, expectation: step.expectation) }
         stepEndsAt = .infinity
-        // 1차 실측에서 음성이 나오는 3초 가까이를 단계 시간에 넣어 움직임이 다음 단계로 밀렸음.
+        // 단계 시간은 음성이 끝난 뒤부터 셈. 1차 실측에서 음성 시간을 단계 시간에 넣어 움직임이 다음 단계로 밀렸음.
         // 합성 입력은 단계 시각이 정해져 있으므로 음성을 기다리지 않음.
         if speak(step.instruction), simulation == nil {
             speechWaitSince = now
@@ -485,12 +501,10 @@ final class Recorder {
         }
     }
 
-    /// 단계 행을 쓰고 그때부터 단계 시간을 셈. replay의 단계 구간도 이 시각부터임.
+    /// 단계 시간을 이 시각부터 셈. 단계 행은 음성이 시작될 때 이미 썼음.
     private func beginStep(at now: Double) {
         speechWaitSince = nil
-        let step = steps[stepIndex]
-        stepEndsAt = now + step.seconds
-        append { .step(rx: $0, id: step.id, expectation: step.expectation) }
+        stepEndsAt = now + steps[stepIndex].seconds
     }
 
     private func speechEnded(_ token: Int) {
@@ -503,8 +517,8 @@ final class Recorder {
         let row = make(ProcessInfo.processInfo.systemUptime)
         writer?.append(row)
         for note in analyzer.handle(row) {
-            let height = note.text == "일어섬" || note.text == "앉음" ? " (높이 \(ReportText.centimeters(analyzer.measuredLevel)))" : ""
-            print("    \(ReportText.fixed(note.at, 1))초 \(note.text)\(height)")
+            let speed = note.text == "일어섬" || note.text == "앉음" ? " (속도 \(ReportText.velocity(analyzer.measuredVelocity)))" : ""
+            print("    \(ReportText.fixed(note.at, 1))초 \(note.text)\(speed)")
         }
     }
 

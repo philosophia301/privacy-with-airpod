@@ -36,6 +36,30 @@ struct ProtocolStep {
             + [walkSit(id: "walk-sit-1"), walkSit(id: "walk-sit-2")]
     }
 
+    /// 3차 확인 기록임. 기준값은 고정한 채 판정만 다시 확인함. 일어섬과 앉음의 짧은 동작, 반쯤 일어섬, 걷기 뒤 멈춤과 앉음,
+    /// 천천히 일어섬과 앉음을 모두 담음. 약 4분임. 반쯤 일어섬은 평가하지 않는 구간이라 판정 기준은 없음.
+    static func check() -> [ProtocolStep] {
+        [
+            ProtocolStep(id: "settle", expectation: .stay, seconds: 10, instruction: "앉은 채 정면을 보고 가만히 계세요"),
+            ProtocolStep(id: "seated-mix", expectation: .stay, seconds: 30, instruction: "앉은 채 몸을 숙여 바닥을 짚고, 기지개를 켜고, 의자를 돌리고, 타자를 치세요"),
+            ProtocolStep(id: "quick-stand-sit", expectation: .stay, seconds: 15, instruction: "일어섰다가 2초 안에 다시 앉기를 두 번 하세요"),
+            ProtocolStep(id: "half-stand-1", expectation: .none, seconds: 10, instruction: "반쯤 일어섰다가 다시 앉으세요"),
+            ProtocolStep(id: "half-stand-2", expectation: .none, seconds: 10, instruction: "반쯤 일어섰다가 다시 앉으세요"),
+            walkSit(id: "walk-sit-1"),
+            walkSit(id: "walk-sit-2"),
+            ProtocolStep(id: "walk-sit-pause", expectation: .leaveThenBack, seconds: 25,
+                         instruction: "일어나서 몇 걸음 걸었다가 돌아와 의자 앞에서 1~2초 멈춘 뒤 앉으세요"),
+            ProtocolStep(id: "walk-stop-level", expectation: .leave, seconds: 18,
+                         instruction: "일어나서 몇 걸음 걸어간 뒤 고개를 든 채 가만히 서 계세요"),
+            ProtocolStep(id: "back-after-level", expectation: .back, seconds: 12, instruction: "돌아와 앉으세요"),
+            ProtocolStep(id: "walk-stop-down", expectation: .leave, seconds: 18,
+                         instruction: "일어나서 몇 걸음 걸어간 뒤 고개를 숙인 채 가만히 서 계세요"),
+            ProtocolStep(id: "back-after-down", expectation: .back, seconds: 12, instruction: "돌아와 앉으세요"),
+            ProtocolStep(id: "slow-stand", expectation: .leave, seconds: 12, instruction: "일어서서 가만히 서 계세요"),
+            ProtocolStep(id: "slow-sit", expectation: .back, seconds: 15, instruction: "아주 천천히 앉으세요"),
+        ]
+    }
+
     private static func standSit(repeats: Int) -> [ProtocolStep] {
         (1...repeats).flatMap { index in
             [ProtocolStep(id: "stand-\(index)", expectation: .leave, seconds: 15, instruction: "일어서서 가만히 서 계세요"),
@@ -58,6 +82,8 @@ struct SyntheticRecording {
     private let interval = 1.0 / 25
     /// 앱이 표본을 받는 지연을 흉내 냄.
     private let delivery = 0.02
+    /// 걸음 한 번의 표본 수임. 25 Hz에서 0.48초이며 앞 2표본이 착지 충격, 나머지 10표본이 살짝 가벼운 구간임.
+    private let stepSamples = 12
 
     static func make(steps: [ProtocolStep]) -> [RecordedRow] {
         var recording = SyntheticRecording()
@@ -87,9 +113,26 @@ struct SyntheticRecording {
             still(1.5); move(0.45, over: 1.2); still(0.8)
             activity(["walking"]); walk(9); activity(["stationary"])
         case _ where id.hasPrefix("walk-sit"):
-            // 걷던 흔들림이 이어진 채 앉아 정지 구간 없이 내려감. 알려진 놓침 경우임.
+            // 걷다 멈추지 않고 앉음. 걸음이 끝난 뒤에는 앉는 동안 걸음 착지가 없음. walk-sit-pause만 앉기 전에 1.5초 멈춤.
             still(1.5); move(0.45, over: 1.2); still(0.8)
-            activity(["walking"]); walk(6); move(-0.45, over: 1.0, bobbing: true); still(1.0); activity(["stationary"])
+            activity(["walking"]); walk(6)
+            if id == "walk-sit-pause" { still(1.5) }
+            move(-0.45, over: 1.0); still(1.0); activity(["stationary"])
+        case "seated-mix":
+            move(-0.30, over: 1.0); still(1.5); move(0.30, over: 1.0)
+            move(0.08, over: 0.5); still(1.0); move(-0.08, over: 0.5)
+        case "quick-stand-sit":
+            for _ in 0..<2 { move(0.45, over: 1.2); still(0.5); move(-0.45, over: 1.0); still(3) }
+        case "half-stand-1", "half-stand-2":
+            move(0.20, over: 1.0); still(1.0); move(-0.20, over: 1.0)
+        case "walk-stop-level", "walk-stop-down":
+            move(0.45, over: 1.2); activity(["walking"]); walk(6); activity(["stationary"])
+        case "back-after-level", "back-after-down":
+            activity(["walking"]); walk(3); move(-0.45, over: 1.0); still(1.0); activity(["stationary"])
+        case "slow-stand":
+            move(0.45, over: 1.2)
+        case "slow-sit":
+            move(-0.45, over: 2.5)
         default:
             break
         }
@@ -107,25 +150,23 @@ struct SyntheticRecording {
         for _ in 0..<max(0, Int((seconds / interval).rounded())) { sample(upward: 0) }
     }
 
-    /// 높이가 0.5·h·(1-cos)로 바뀌는 움직임의 가속도를 냄. bobbing이면 걷는 흔들림을 더함.
-    private mutating func move(_ meters: Double, over seconds: Double, bobbing: Bool = false) {
+    /// 높이가 0.5·h·(1-cos)로 바뀌는 움직임의 가속도를 냄.
+    private mutating func move(_ meters: Double, over seconds: Double) {
         let omega = Double.pi / seconds
         let count = Int((seconds / interval).rounded())
         for index in 0..<count {
             let elapsed = Double(index) * interval
-            let upward = 0.5 * meters * omega * omega * cos(omega * elapsed)
-            sample(upward: upward + (bobbing ? bob(elapsed) : 0))
+            sample(upward: 0.5 * meters * omega * omega * cos(omega * elapsed))
         }
     }
 
+    /// 걸음마다 발이 닿는 충격을 냄. 앞 2표본은 +5 m/s², 나머지 10표본은 -1 m/s²라 한 걸음의 속도 변화는 0임.
+    /// 걸음을 끝까지 채워 내야 속도 잔량이 남지 않음. 잔량이 남으면 뒤따르는 앉기의 최고 속도가 작아져 판정이 달라짐.
     private mutating func walk(_ seconds: Double) {
-        let count = Int((seconds / interval).rounded())
-        for index in 0..<count { sample(upward: bob(Double(index) * interval)) }
-    }
-
-    /// 걸음마다 오르내리는 머리 흔들림임. 정지 기준(0.4m/s²)보다 커서 걷는 동안 정지가 생기지 않음.
-    private func bob(_ elapsed: Double) -> Double {
-        1.2 * sin(2 * .pi * 2 * elapsed) + 0.8 * cos(2 * .pi * 1 * elapsed)
+        let steps = max(1, Int((seconds / (Double(stepSamples) * interval)).rounded()))
+        for index in 0..<(steps * stepSamples) {
+            sample(upward: index % stepSamples < 2 ? 5 : -1)
+        }
     }
 
     private mutating func sample(upward: Double) {
