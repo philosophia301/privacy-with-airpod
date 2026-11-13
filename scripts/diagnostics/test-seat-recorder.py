@@ -67,7 +67,24 @@ class SeatRecorderTest(unittest.TestCase):
         self.assertEqual(verdicts["walk-away"], "ok")
         report, verdicts = self.verdicts("--standing-delay", "8")
         self.assertEqual(report["timing"]["standingDelay"], 8)
+        stand = next(step for step in report["steps"] if step["id"] == "stand-1")
+        self.assertAlmostEqual(stand["awayAfter"], 11.0, delta=0.2)
+        # 15초 단계 안에 3초 정도 걸리는 일어섬과 대기가 끝나지 않으면 놓침임.
+        _, verdicts = self.verdicts("--standing-delay", "13")
         self.assertEqual(verdicts["stand-1"], "missed")
+
+    def test_quick_order_keeps_only_stand_sit_and_walk_sit(self):
+        path = self.dir / "quick.csv"
+        result = self.run_tool("synth", "--out", path, "--quick", "--repeat", "2")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        result = self.run_tool("replay", path, "--json")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout)
+        ids = [step["id"] for step in report["steps"] if step["expectation"] != "none"]
+        self.assertEqual(ids, ["settle", "stand-1", "sit-1", "stand-2", "sit-2", "walk-sit-1", "walk-sit-2"])
+        # 걷다 바로 앉기는 정지 구간 없이 앉아 지금 규칙으로는 돌아오지 못하는 알려진 경우임.
+        # 그래서 두 번째는 자리 비움인 채 시작해 판정하지 않음.
+        self.assertEqual(report["counts"], {"ok": 5, "stuck": 1, "not-applicable": 1})
 
     def test_text_report_lists_each_step_and_a_summary(self):
         result = self.run_tool("replay", self.recording)

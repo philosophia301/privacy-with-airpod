@@ -38,7 +38,8 @@ public struct InertialProbe: Sendable {
         let scaled = gravity / scale
         let norm = (scaled.x * scaled.x + scaled.y * scaled.y + scaled.z * scaled.z).squareRoot()
         let down = scaled / norm
-        let upward = -(acceleration.x * down.x + acceleration.y * down.y + acceleration.z * down.z) * 9.80665
+        // SeatPresence와 같은 관례임. userAcceleration은 위로 가속할 때 gravity와 같은 쪽을 가리킴.
+        let upward = (acceleration.x * down.x + acceleration.y * down.y + acceleration.z * down.z) * 9.80665
         guard upward.isFinite else {
             invalidate("투영 계산 범위 초과")
             return

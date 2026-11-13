@@ -154,7 +154,8 @@ final class ProtectionHarness {
             let t = Double(step) * 0.05
             let upward = 0.5 * meters * omega * omega * cos(omega * t)
             motion.send(HeadSample(timestamp: clock.now, receivedAt: clock.now, yaw: 0,
-                                   acceleration: SIMD3(0, 0, upward / 9.80665), gravity: SIMD3(0, 0, -1),
+                                   // Core Motion 관례대로 위로 가속하면 사용자 가속도가 중력과 같은 쪽을 가리킴.
+                                   acceleration: SIMD3(0, 0, -upward / 9.80665), gravity: SIMD3(0, 0, -1),
                                    source: 1))
             clock.advance()
         }

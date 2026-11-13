@@ -81,7 +81,7 @@ public struct SeatPresence: Sendable {
     }
 
     /// 머리 움직임 표본 하나를 넣고 자세가 바뀌면 이벤트를 돌려줌.
-    /// acceleration은 g 단위 사용자 가속도, gravity는 g 단위 아래 방향 벡터임.
+    /// acceleration은 g 단위 사용자 가속도, gravity는 g 단위 아래 방향 벡터이며 둘 다 Core Motion 관례를 따름.
     public mutating func ingest(timestamp: Double, acceleration: SIMD3<Double>, gravity: SIMD3<Double>) -> Event? {
         guard timestamp.isFinite,
               let vertical = Self.verticalAcceleration(acceleration, gravity: gravity) else {
@@ -232,7 +232,9 @@ public struct SeatPresence: Sendable {
         let scaled = gravity / scale
         let norm = (scaled.x * scaled.x + scaled.y * scaled.y + scaled.z * scaled.z).squareRoot()
         let down = scaled / norm
-        let upward = -(acceleration.x * down.x + acceleration.y * down.y + acceleration.z * down.z) * 9.80665
+        // Core Motion의 userAcceleration은 머리가 위로 가속할 때 gravity와 같은 쪽을 가리킴.
+        // 2026-11-13 실측에서 반대 부호로 두었더니 일어섬이 내려감으로 계산됐음.
+        let upward = (acceleration.x * down.x + acceleration.y * down.y + acceleration.z * down.z) * 9.80665
         return upward.isFinite ? upward : nil
     }
 

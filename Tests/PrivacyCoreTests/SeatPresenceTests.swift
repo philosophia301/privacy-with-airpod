@@ -16,8 +16,9 @@ private struct Stream {
     }
 
     /// vertical은 위쪽 양수 m/s²임. 중력은 아래 방향 (0, 0, -1)으로 고정함.
+    /// Core Motion 관례대로 위로 가속하면 사용자 가속도가 중력과 같은 쪽(-z)을 가리킴.
     mutating func feed(timestamp: Double, vertical: Double) {
-        let acceleration = SIMD3<Double>(0, 0, vertical / 9.80665)
+        let acceleration = SIMD3<Double>(0, 0, -vertical / 9.80665)
         if let event = presence.ingest(timestamp: timestamp, acceleration: acceleration,
                                        gravity: SIMD3(0, 0, -1)) {
             events.append(event)

@@ -4,8 +4,9 @@ import XCTest
 final class InertialProbeTests: XCTestCase {
     private let down = SIMD3<Double>(0, 0, -1)
 
+    /// metresPerSecondSquared는 위쪽 양수임. Core Motion 관례대로 위로 가속하면 사용자 가속도가 중력과 같은 쪽을 가리킴.
     private func feed(_ probe: inout InertialProbe, _ time: Double, _ metresPerSecondSquared: Double = 1) {
-        probe.ingest(timestamp: time, acceleration: SIMD3(0, 0, metresPerSecondSquared / 9.80665), gravity: down)
+        probe.ingest(timestamp: time, acceleration: SIMD3(0, 0, -metresPerSecondSquared / 9.80665), gravity: down)
     }
 
     func testKnownUpwardAccelerationThenDeceleration() {
@@ -26,7 +27,8 @@ final class InertialProbeTests: XCTestCase {
     func testRotatingGravityAxesPreservesVerticalProjectionAndRejectsHorizontalComponent() {
         var probe = InertialProbe()
         let directions: [SIMD3<Double>] = [SIMD3(0, 0, -2), SIMD3(-3, 0, 0), SIMD3(0, -4, 0)]
-        let accelerations: [SIMD3<Double>] = [SIMD3(7, 0, 1), SIMD3(1, 7, 0), SIMD3(0, 1, 7)]
+        // 중력 방향 성분이 1 m/s²인 위쪽 가속도이고 나머지는 수평 성분임.
+        let accelerations: [SIMD3<Double>] = [SIMD3(7, 0, -1), SIMD3(-1, 7, 0), SIMD3(0, -1, 7)]
         for i in 0...2 {
             probe.ingest(timestamp: Double(i) / 4, acceleration: accelerations[i] / 9.80665, gravity: directions[i])
         }

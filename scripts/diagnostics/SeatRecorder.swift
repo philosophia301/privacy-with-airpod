@@ -9,9 +9,9 @@ import PrivacyCore
 @main
 struct SeatRecorderTool {
     static let usage = """
-    seat-recorder record --out 새파일.csv [--repeat N] [--no-voice] [--wait 초] [--simulate]
+    seat-recorder record --out 새파일.csv [--quick] [--repeat N] [--no-voice] [--wait 초] [--simulate]
     seat-recorder replay 기록.csv [--json] [기준값 인자]
-    seat-recorder synth --out 새파일.csv [--repeat N]
+    seat-recorder synth --out 새파일.csv [--quick] [--repeat N]
 
     기준값 인자: \(TuningFlag.all.map(\.flag).joined(separator: " ")) --standing-delay --return-settle
     """
@@ -86,10 +86,10 @@ struct SeatRecorderTool {
 
     static func synth(_ arguments: inout Arguments) throws -> Int32 {
         let path = try arguments.requiredValue("--out")
-        let repeats = try arguments.repeats()
+        let steps = try arguments.steps()
         try arguments.finish()
         let writer = try RowWriter.create(path: path)
-        for row in SyntheticRecording.make(repeats: repeats) { writer.append(row) }
+        for row in SyntheticRecording.make(steps: steps) { writer.append(row) }
         try writer.close()
         print(path)
         return 0
@@ -140,6 +140,13 @@ struct Arguments {
             throw ToolError(message: "--repeat는 1~10 정수여야 함", code: 64)
         }
         return Int(value)
+    }
+
+    /// --quick이면 앉은 채 유지, 일어서기와 앉기, 걷다 바로 앉기만 하는 짧은 순서를 씀.
+    mutating func steps() throws -> [ProtocolStep] {
+        let quick = flag("--quick")
+        let repeats = try repeats()
+        return quick ? ProtocolStep.quick(repeats: repeats) : ProtocolStep.standard(repeats: repeats)
     }
 
     mutating func positional() -> String? {
@@ -196,6 +203,8 @@ final class Recorder {
     private static let silenceNotice = 1.0
     /// 이 간격마다 파일에 씀. 창을 닫거나 강제 종료해도 그때까지의 기록이 남게 함.
     private static let flushInterval = 1.0
+    /// 안내 음성이 이 시간 안에 끝나지 않으면 기다리지 않고 단계를 시작함.
+    private static let speechLimit = 10.0
 
     private let path: String
     private let steps: [ProtocolStep]
@@ -226,6 +235,10 @@ final class Recorder {
     private var timer: Timer?
     private var interruptions: [DispatchSourceSignal] = []
     private var speaker: Process?
+    /// 끝난 음성이 지금 음성인지 가리는 번호임. 앞 음성을 끊을 때 온 종료 알림을 무시함.
+    private var speechToken = 0
+    /// 안내 음성이 끝나기를 기다리기 시작한 시각임. 단계 행과 단계 시간은 음성이 끝난 뒤부터임.
+    private var speechWaitSince: Double?
     private var exitCode: Int32?
 
     private init(path: String, steps: [ProtocolStep], voice: String?, waitLimit: Double, simulation: [RecordedRow]?) {
@@ -238,7 +251,7 @@ final class Recorder {
 
     static func run(_ arguments: inout Arguments) throws -> Int32 {
         let path = try arguments.requiredValue("--out")
-        let repeats = try arguments.repeats()
+        let steps = try arguments.steps()
         let quiet = arguments.flag("--no-voice")
         let waitLimit = try arguments.number("--wait") ?? 20
         let simulate = arguments.flag("--simulate")
@@ -254,9 +267,9 @@ final class Recorder {
               directory.boolValue else {
             throw ToolError(message: "기록 파일의 폴더가 없음: \(url.deletingLastPathComponent().path)", code: 64)
         }
-        let recorder = Recorder(path: path, steps: ProtocolStep.standard(repeats: repeats),
+        let recorder = Recorder(path: path, steps: steps,
                                 voice: quiet ? nil : koreanVoice(), waitLimit: waitLimit,
-                                simulation: simulate ? SyntheticRecording.make(repeats: repeats) : nil)
+                                simulation: simulate ? SyntheticRecording.make(steps: steps) : nil)
         try recorder.start()
         while recorder.exitCode == nil {
             RunLoop.main.run(mode: .default, before: .distantFuture)
@@ -275,7 +288,7 @@ final class Recorder {
             }
         }
         let total = steps.reduce(Self.leadIn) { $0 + $1.seconds }
-        print("단계 \(steps.count)개, 약 \(Int(total.rounded()))초. AirPods를 끼고 의자에 앉아 화면 정면을 보세요.")
+        print("단계 \(steps.count)개, 안내 음성을 빼고 약 \(Int(total.rounded()))초. AirPods를 끼고 의자에 앉아 화면 정면을 보세요.")
         print("안내 음성에 따라 움직이세요. Ctrl+C로 멈추면 그때까지의 기록과 결과를 남김.")
         print("AirPods 동작 입력을 기다림. 최대 \(Int(waitLimit))초")
         if simulation == nil, CMHeadphoneMotionManager.authorizationStatus() == .notDetermined {
@@ -421,6 +434,7 @@ final class Recorder {
             silent = true
             print("    입력 끊김. AirPods 착용과 연결을 확인해 주세요")
         }
+        if let since = speechWaitSince, now - since > Self.speechLimit { beginStep(at: now) }
         if now >= stepEndsAt { nextStep(at: now) }
         if exitCode == nil, now - lastFlush >= Self.flushInterval {
             lastFlush = now
@@ -460,10 +474,28 @@ final class Recorder {
             return
         }
         let step = steps[stepIndex]
-        stepEndsAt = now + step.seconds
         print("[\(stepIndex + 1)/\(steps.count)] \(step.id) \(Int(step.seconds))초: \(step.instruction)")
+        stepEndsAt = .infinity
+        // 1차 실측에서 음성이 나오는 3초 가까이를 단계 시간에 넣어 움직임이 다음 단계로 밀렸음.
+        // 합성 입력은 단계 시각이 정해져 있으므로 음성을 기다리지 않음.
+        if speak(step.instruction), simulation == nil {
+            speechWaitSince = now
+        } else {
+            beginStep(at: now)
+        }
+    }
+
+    /// 단계 행을 쓰고 그때부터 단계 시간을 셈. replay의 단계 구간도 이 시각부터임.
+    private func beginStep(at now: Double) {
+        speechWaitSince = nil
+        let step = steps[stepIndex]
+        stepEndsAt = now + step.seconds
         append { .step(rx: $0, id: step.id, expectation: step.expectation) }
-        speak(step.instruction)
+    }
+
+    private func speechEnded(_ token: Int) {
+        guard exitCode == nil, token == speechToken, speechWaitSince != nil else { return }
+        beginStep(at: ProcessInfo.processInfo.systemUptime)
     }
 
     /// 받은 시각(rx)은 쓰는 순간에 읽음. 한 주기 안에서 먼저 읽은 시각으로 늦게 쓰면 파일의 rx가 거꾸로 가 replay가 거부함.
@@ -518,14 +550,29 @@ final class Recorder {
         speaker?.terminate()
     }
 
-    private func speak(_ text: String) {
-        guard let voice else { return }
+    /// 음성을 시작했으면 true임. 끝나면 speechEnded로 알림.
+    @discardableResult
+    private func speak(_ text: String) -> Bool {
+        guard let voice else { return false }
         speaker?.terminate()
+        speechToken += 1
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/say")
         process.arguments = ["-v", voice, text]
-        try? process.run()
+        process.terminationHandler = Self.speechHandler(self, token: speechToken)
+        guard (try? process.run()) != nil else {
+            speaker = nil
+            return false
+        }
         speaker = process
+        return true
+    }
+
+    /// say 종료 알림은 별도 스레드에서 옴. main queue로 넘겨 단계 처리와 순서를 맞춤.
+    nonisolated private static func speechHandler(_ recorder: Recorder, token: Int) -> @Sendable (Process) -> Void {
+        { @Sendable _ in
+            DispatchQueue.main.async { MainActor.assumeIsolated { recorder.speechEnded(token) } }
+        }
     }
 
     /// 설치된 한국어 음성을 고름. 없으면 안내를 화면에만 씀.

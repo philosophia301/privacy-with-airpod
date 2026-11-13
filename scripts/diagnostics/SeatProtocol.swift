@@ -10,24 +10,41 @@ struct ProtocolStep {
     let seconds: Double
     let instruction: String
 
-    /// 일어서기와 앉기는 반복해 표본을 늘림. 단계 길이는 안내를 듣고 움직인 뒤 3초 대기까지 담도록 잡음.
+    /// 일어서기와 앉기는 반복해 표본을 늘림. 단계 시간은 안내 음성이 끝난 뒤부터 셈.
+    /// 1차 실측(2026-11-13)에서 움직임이 끝나기까지 음성 뒤 3~4초가 걸려, 3초 대기까지 담도록 15초로 잡음.
     static func standard(repeats: Int) -> [ProtocolStep] {
         var steps = [
             ProtocolStep(id: "settle", expectation: .stay, seconds: 15, instruction: "앉은 채 정면을 보고 가만히 계세요"),
             ProtocolStep(id: "typing", expectation: .stay, seconds: 20, instruction: "앉은 채 평소처럼 타자를 치거나 마우스를 쓰세요"),
         ]
-        for index in 1...repeats {
-            steps.append(ProtocolStep(id: "stand-\(index)", expectation: .leave, seconds: 10, instruction: "일어서서 가만히 서 계세요"))
-            steps.append(ProtocolStep(id: "sit-\(index)", expectation: .back, seconds: 10, instruction: "다시 앉아서 정면을 보세요"))
-        }
+        steps += standSit(repeats: repeats)
         steps += [
             ProtocolStep(id: "shift", expectation: .stay, seconds: 12, instruction: "앉은 채 엉덩이를 들썩여 자세를 고쳐 앉으세요"),
             ProtocolStep(id: "lean", expectation: .stay, seconds: 12, instruction: "앉은 채 바닥의 물건을 줍듯 숙였다가 올라오세요"),
-            ProtocolStep(id: "walk-away", expectation: .leave, seconds: 20, instruction: "일어나서 몇 걸음 걸어갔다가 의자 옆으로 돌아와 서 계세요"),
-            ProtocolStep(id: "sit-after-walk", expectation: .back, seconds: 10, instruction: "다시 앉아서 정면을 보세요"),
-            ProtocolStep(id: "walk-sit", expectation: .leaveThenBack, seconds: 20, instruction: "일어나서 몇 걸음 걸었다가 돌아와 멈추지 말고 바로 앉으세요"),
+            ProtocolStep(id: "walk-away", expectation: .leave, seconds: 25, instruction: "일어나서 몇 걸음 걸어갔다가 의자 옆으로 돌아와 서 계세요"),
+            ProtocolStep(id: "sit-after-walk", expectation: .back, seconds: 15, instruction: "다시 앉아서 정면을 보세요"),
+            walkSit(id: "walk-sit"),
         ]
         return steps
+    }
+
+    /// 앉은 채 유지, 일어서기와 앉기, 걸어갔다 와서 바로 앉기만 하는 짧은 순서임.
+    /// 앉은 채 하는 다른 동작은 standard 기록으로 보고, 일어섬과 앉음, 걷다 바로 앉음 표본을 빨리 모으는 용도임.
+    static func quick(repeats: Int) -> [ProtocolStep] {
+        [ProtocolStep(id: "settle", expectation: .stay, seconds: 10, instruction: "앉은 채 정면을 보고 가만히 계세요")]
+            + standSit(repeats: repeats)
+            + [walkSit(id: "walk-sit-1"), walkSit(id: "walk-sit-2")]
+    }
+
+    private static func standSit(repeats: Int) -> [ProtocolStep] {
+        (1...repeats).flatMap { index in
+            [ProtocolStep(id: "stand-\(index)", expectation: .leave, seconds: 15, instruction: "일어서서 가만히 서 계세요"),
+             ProtocolStep(id: "sit-\(index)", expectation: .back, seconds: 15, instruction: "다시 앉아서 정면을 보세요")]
+        }
+    }
+
+    private static func walkSit(id: String) -> ProtocolStep {
+        ProtocolStep(id: id, expectation: .leaveThenBack, seconds: 25, instruction: "일어나서 몇 걸음 걸었다가 돌아와 멈추지 말고 바로 앉으세요")
     }
 }
 
@@ -42,11 +59,11 @@ struct SyntheticRecording {
     /// 앱이 표본을 받는 지연을 흉내 냄.
     private let delivery = 0.02
 
-    static func make(repeats: Int) -> [RecordedRow] {
+    static func make(steps: [ProtocolStep]) -> [RecordedRow] {
         var recording = SyntheticRecording()
         recording.mark("ready", .none)
         recording.still(3)
-        for step in ProtocolStep.standard(repeats: repeats) {
+        for step in steps {
             let start = recording.time
             recording.mark(step.id, step.expectation)
             recording.perform(step.id)
@@ -69,7 +86,7 @@ struct SyntheticRecording {
         case "walk-away":
             still(1.5); move(0.45, over: 1.2); still(0.8)
             activity(["walking"]); walk(9); activity(["stationary"])
-        case "walk-sit":
+        case _ where id.hasPrefix("walk-sit"):
             // 걷던 흔들림이 이어진 채 앉아 정지 구간 없이 내려감. 알려진 놓침 경우임.
             still(1.5); move(0.45, over: 1.2); still(0.8)
             activity(["walking"]); walk(6); move(-0.45, over: 1.0, bobbing: true); still(1.0); activity(["stationary"])
@@ -113,8 +130,9 @@ struct SyntheticRecording {
 
     private mutating func sample(upward: Double) {
         let noise = SIMD3(jitter(), jitter(), jitter())
+        // Core Motion 관례대로 위로 가속하면 사용자 가속도가 중력과 같은 쪽(-z)을 가리킴.
         rows.append(.motion(rx: time + delivery, t: time,
-                            acceleration: SIMD3(0, 0, upward / 9.80665) + noise,
+                            acceleration: SIMD3(0, 0, -upward / 9.80665) + noise,
                             gravity: SIMD3(0, 0, -1), source: 1))
         time += interval
     }
