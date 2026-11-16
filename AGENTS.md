@@ -2,7 +2,8 @@
 
 AirPods 착용 중 고개를 돌리거나 자리를 벗어나면 Mac 화면을 블러 처리하는 앱을 준비 중임. 현재는 승인된 사용자 흐름의 첫 실험 앱을 구현 중이며 제품의 최종 실패·복귀 정책은 확정 전임.
 
-작업 시작 시 이 파일과 [TODO](TODO.md)를 먼저 읽음. 승인된 제품 행동은 [spec](docs/spec.md), 결정 절차는 [spec 결정 규칙](docs/rules/spec-decisions.md)이 소유함. 대화에서 받은 최신 사용자 지시를 우선하고 중요한 결정을 정본에 반영함.
+작업 시작 시 이 파일과 [ROADMAP](ROADMAP.md)의 단위 상태, 진행 단위가 있으면 그 [TODO](TODO.md) 절을 먼저 읽음.
+승인된 제품 행동은 [spec](docs/spec.md), 결정 절차는 [spec 결정 규칙](docs/rules/spec-decisions.md)이 소유함. 대화에서 받은 최신 사용자 지시를 우선하고 중요한 결정을 정본에 반영함.
 
 ## 배치 지도
 
@@ -35,8 +36,8 @@ AirPods 착용 중 고개를 돌리거나 자리를 벗어나면 Mac 화면을 �
 | `README.md` | 프로젝트 목적·현재 사용 가능 여부·문서 진입점 |
 | `AGENTS.md` | 작업 진입점·배치 지도·검증 안내 |
 | `CLAUDE.md` | Claude 세션이 시작할 때 `AGENTS.md`를 싣는 `@AGENTS.md` 한 줄 |
-| `ROADMAP.md` | 큰 개발 단위·선행 조건 |
-| `TODO.md` | 현재 Phase·완료 조건·미결·다음 행동 |
+| `ROADMAP.md` | 개발 단위의 상태·목적·완료 근거, 보류 단위의 열린 단계, 단위 형식 |
+| `TODO.md` | 진행 단위의 열린 단계·결정·검증 근거 |
 | `docs/spec.md` | 사용자 행동·결정 후보·승인된 선택과 이유 |
 | `docs/feasibility.md` | 플랫폼 조사 근거·기술 가정·실기기 검증 계획 |
 | `docs/assets/blur-reference/` | 사용자가 제공한 블러 reference 이미지 원본. 해석과 결정은 spec 소유 |

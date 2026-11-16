@@ -13,8 +13,8 @@ AirPods를 착용한 사용자가 고개를 돌리거나 자리를 벗어날 때
 | 알고 싶은 것 | 문서 |
 | --- | --- |
 | 어떤 행동을 만들고 무엇을 함께 정할지 | [제품 spec 초안](docs/spec.md) |
-| 지금 진행할 일과 완료 조건 | [TODO](TODO.md) |
-| 개발 단계와 선행 조건 | [ROADMAP](ROADMAP.md) |
+| 개발 단위의 상태와 남은 확인 | [ROADMAP](ROADMAP.md) |
+| 진행 중인 단위의 열린 단계 | [TODO](TODO.md) |
 | 기술적으로 확인한 사실과 아직 모르는 것 | [기술 타당성 조사](docs/feasibility.md) |
 | 작업 규칙·배치 지도·검증 안내 | [AGENTS](AGENTS.md) |
 
