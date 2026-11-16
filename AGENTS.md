@@ -34,6 +34,7 @@ AirPods 착용 중 고개를 돌리거나 자리를 벗어나면 Mac 화면을 �
 | `docs/performance.md` | 성능 조사 조건·비교 결과·다음 최적화 우선순위 |
 | `README.md` | 프로젝트 목적·현재 사용 가능 여부·문서 진입점 |
 | `AGENTS.md` | 작업 진입점·배치 지도·검증 안내 |
+| `CLAUDE.md` | Claude 세션이 시작할 때 `AGENTS.md`를 싣는 `@AGENTS.md` 한 줄 |
 | `ROADMAP.md` | 큰 개발 단위·선행 조건 |
 | `TODO.md` | 현재 Phase·완료 조건·미결·다음 행동 |
 | `docs/spec.md` | 사용자 행동·결정 후보·승인된 선택과 이유 |
