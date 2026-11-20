@@ -26,14 +26,6 @@ final class AppModel: ObservableObject {
     @Published private(set) var protected = false
     @Published private(set) var startingProtection = false
     @Published private(set) var suspended = false
-    @Published var retainBlurOnInputLoss = false {
-        didSet {
-            persistSettings()
-            if !retainBlurOnInputLoss && retainingForInputLoss {
-                releaseForInputLoss()
-            }
-        }
-    }
     @Published var demo = true
     @Published var demoAngle = 0.0
     /// CoreMotion yaw는 위에서 볼 때 왼쪽 회전이 양수라서 뒤집어 오른쪽 회전을 양수로 맞춤. 바꾸는 기능은 없음.
@@ -69,7 +61,6 @@ final class AppModel: ObservableObject {
     private var filteredYaw: Double?
     private var lastTick: TimeInterval
     private var request = 0
-    private var retainingForInputLoss = false
     private var previewWindowVisible = false
     /// 고개 따라가기(0)와 최대 블러(1) 사이의 가림 정도. 늦은 입력 동안 서서히 덮고, 제때 온 입력이 다시 오면 바로 0이 됨.
     private var lateCoverage = 0.0
@@ -107,7 +98,6 @@ final class AppModel: ObservableObject {
         motion.onError = { [weak self] error in self?.invalidateMotion(error) }
         cover.onFailure = { [weak self] error in
             guard let self else { return }
-            self.retainingForInputLoss = false
             self.suspended = true
             self.captureStatus = "화면 처리 중단: \(error) — 보호 끄기 후 다시 시도"
             self.updateCovers()
@@ -214,7 +204,6 @@ final class AppModel: ObservableObject {
         protected = false
         startingProtection = false
         suspended = false
-        retainingForInputLoss = false
         captureStatus = "보호 꺼짐"
         lateCoverage = 0
         reconcileTicking()
@@ -351,18 +340,8 @@ final class AppModel: ObservableObject {
         lateCoverage = 0
         refreshAngle()
         reconcileTicking()
+        // 입력이 끊기면 늘 블러를 풀고 보호를 끔. 끊긴 채 가려 두는 선택은 2026-11-20에 뺐음.
         guard protected || startingProtection else { return }
-        if retainBlurOnInputLoss {
-            retainingForInputLoss = true
-            suspended = true
-            captureStatus = "입력 중단 · 전체 블러 유지 · 보호를 끄고 다시 보정해 주세요"
-            updateCovers()
-        } else {
-            releaseForInputLoss()
-        }
-    }
-
-    private func releaseForInputLoss() {
         stopProtection()
         captureStatus = "입력 중단 · 블러 해제됨 · 재착용 후 정면 보정과 보호 시작이 필요함"
     }
@@ -423,7 +402,6 @@ final class AppModel: ObservableObject {
         maximumBlur = stored.maximumBlur
         connectionWidth = stored.connectionWidth
         responseTime = stored.responseTime
-        retainBlurOnInputLoss = stored.retainBlurOnInputLoss
         armLengthCM = stored.armLengthCM
         armGuide = stored.armGuide.guide
     }
@@ -433,7 +411,6 @@ final class AppModel: ObservableObject {
         guard !restoringSettings else { return }
         memory.saveSettings(StoredSettings(startAngle: startAngle, maximumBlur: maximumBlur,
                                            connectionWidth: connectionWidth, responseTime: responseTime,
-                                           retainBlurOnInputLoss: retainBlurOnInputLoss,
                                            armLengthCM: armLengthCM, armGuide: StoredGuide(armGuide)))
     }
 

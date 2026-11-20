@@ -26,7 +26,7 @@ struct SettingsMemoryFlowTests {
                 defaults.set(42, forKey: SettingsMemory.settingsKey)
             case .koreanGuideName:
                 // 화면 문구인 '남성'은 저장 키가 아니므로 읽지 않고 기본값을 써야 함.
-                defaults.set(Data(#"{"startAngle":20,"maximumBlur":50,"connectionWidth":10,"responseTime":0.3,"retainBlurOnInputLoss":true,"armLengthCM":70,"armGuide":"남성"}"#.utf8),
+                defaults.set(Data(#"{"startAngle":20,"maximumBlur":50,"connectionWidth":10,"responseTime":0.3,"armLengthCM":70,"armGuide":"남성"}"#.utf8),
                              forKey: SettingsMemory.settingsKey)
             }
         }
@@ -61,14 +61,14 @@ struct SettingsMemoryFlowTests {
         #expect(h.model.maximumBlur == 31.25)
         #expect(h.model.connectionWidth == 25)
         #expect(h.model.responseTime == 0.18)
-        #expect(!h.model.retainBlurOnInputLoss)
         #expect(h.model.armLengthCM == 53.012)
         #expect(h.model.armGuide == .female)
         #expect(h.model.appliedPoses.isEmpty)
     }
 
-    /// 자리 이탈 스위치가 있던 개발 판(2026-11-12~20)이 남긴 hideWhenAway 키는 무시하고 나머지 값을 되살림.
-    @Test func settingsSavedWithTheRemovedAwaySwitchKeepTheirValues() throws {
+    /// 뺀 선택이 남긴 키는 무시하고 나머지 값을 되살림. hideWhenAway는 자리 이탈 스위치가 있던 개발 판(2026-11-12~20),
+    /// retainBlurOnInputLoss는 0.1.5까지 배포된 '계속 가리기' 선택임(2026-11-20에 뺌).
+    @Test func settingsSavedWithRemovedChoicesKeepTheirValues() throws {
         let h = try ProtectionHarness()
         defer { h.tearDown() }
         h.defaults.set(Data(#"{"startAngle":20,"maximumBlur":50,"connectionWidth":10,"responseTime":0.3,"retainBlurOnInputLoss":true,"hideWhenAway":false,"armLengthCM":70,"armGuide":"male"}"#.utf8),
@@ -79,7 +79,6 @@ struct SettingsMemoryFlowTests {
         #expect(again.maximumBlur == 50)
         #expect(again.connectionWidth == 10)
         #expect(again.responseTime == 0.3)
-        #expect(again.retainBlurOnInputLoss)
         #expect(again.armLengthCM == 70)
         #expect(again.armGuide == .male)
     }
@@ -91,7 +90,6 @@ struct SettingsMemoryFlowTests {
         h.model.maximumBlur = 50
         h.model.connectionWidth = 10
         h.model.responseTime = 0.3
-        h.model.retainBlurOnInputLoss = true
         h.model.armLengthCM = 70
         h.model.armGuide = .male
 
@@ -100,7 +98,6 @@ struct SettingsMemoryFlowTests {
         #expect(again.maximumBlur == 50)
         #expect(again.connectionWidth == 10)
         #expect(again.responseTime == 0.3)
-        #expect(again.retainBlurOnInputLoss)
         #expect(again.armLengthCM == 70)
         #expect(again.armGuide == .male)
     }
@@ -238,7 +235,6 @@ struct SettingsMemoryFlowTests {
         #expect(again.maximumBlur == 31.25)
         #expect(again.connectionWidth == 25)
         #expect(again.responseTime == 0.18)
-        #expect(!again.retainBlurOnInputLoss)
         #expect(again.armLengthCM == 53.012)
         #expect(again.armGuide == .female)
         // 설정 값이 깨져도 조합 배치는 별개 항목이므로 그대로 되살아남.
@@ -263,7 +259,7 @@ struct SettingsMemoryFlowTests {
     @Test func storedSettingsAboveTheSliderRangesAreClampedToTheUpperEdge() throws {
         let h = try ProtectionHarness()
         defer { h.tearDown() }
-        h.defaults.set(Data(#"{"startAngle":90,"maximumBlur":200,"connectionWidth":80,"responseTime":2,"retainBlurOnInputLoss":true,"armLengthCM":100,"armGuide":"male"}"#.utf8),
+        h.defaults.set(Data(#"{"startAngle":90,"maximumBlur":200,"connectionWidth":80,"responseTime":2,"armLengthCM":100,"armGuide":"male"}"#.utf8),
                        forKey: SettingsMemory.settingsKey)
 
         let again = h.relaunch()
@@ -273,13 +269,12 @@ struct SettingsMemoryFlowTests {
         #expect(again.responseTime == 0.5)
         #expect(again.armLengthCM == 85)
         #expect(again.armGuide == .male)
-        #expect(again.retainBlurOnInputLoss)
     }
 
     @Test func storedSettingsBelowTheSliderRangesAreClampedToTheLowerEdge() throws {
         let h = try ProtectionHarness()
         defer { h.tearDown() }
-        h.defaults.set(Data(#"{"startAngle":-5,"maximumBlur":5,"connectionWidth":-1,"responseTime":0.001,"retainBlurOnInputLoss":false,"armLengthCM":10,"armGuide":"female"}"#.utf8),
+        h.defaults.set(Data(#"{"startAngle":-5,"maximumBlur":5,"connectionWidth":-1,"responseTime":0.001,"armLengthCM":10,"armGuide":"female"}"#.utf8),
                        forKey: SettingsMemory.settingsKey)
 
         let again = h.relaunch()
@@ -288,7 +283,6 @@ struct SettingsMemoryFlowTests {
         #expect(again.connectionWidth == 0)
         #expect(again.responseTime == 0.03)
         #expect(again.armLengthCM == 40)
-        #expect(!again.retainBlurOnInputLoss)
     }
 
     @Test(arguments: UnusableMonitors.allCases)

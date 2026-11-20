@@ -44,13 +44,12 @@ struct SettingsMemory {
     }
 }
 
-/// 가리기 값, 입력 중단 정책, 팔 길이, 모형. 범위는 HideTab과 LayoutSheet 슬라이더와 같아야 함.
+/// 가리기 값, 팔 길이, 모형. 범위는 HideTab과 LayoutSheet 슬라이더와 같아야 함.
 struct StoredSettings: Codable, Equatable {
     var startAngle: Double
     var maximumBlur: Double
     var connectionWidth: Double
     var responseTime: Double
-    var retainBlurOnInputLoss: Bool
     var armLengthCM: Double
     var armGuide: StoredGuide
 

@@ -1,6 +1,6 @@
 import SwiftUI
 
-// 준비 탭. 준비 항목을 스탬프 타일로 그리고 'AirPods를 벗으면' 선택을 둠.
+// 준비 탭. 준비 항목을 스탬프 타일로 그리고 '로그인할 때 열기' 줄을 둠.
 // 항목의 상태와 문구는 Readiness가 소유함. 여기서는 표시와 동작 연결만 함.
 
 struct ReadyTab: View {
@@ -18,7 +18,6 @@ struct ReadyTab: View {
             }
             .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
-            LossChoice(model: model)
             LoginItemRow(loginItem: loginItem)
         }
     }
@@ -157,95 +156,6 @@ private struct StampIcon: View {
         path.move(to: start)
         path.addLine(to: end)
         return path
-    }
-}
-
-// 'AirPods를 벗으면' 선택. 값은 AppModel.retainBlurOnInputLoss 하나이며 여기서 정책을 바꾸지 않음.
-private struct LossChoice: View {
-    @ObservedObject var model: AppModel
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("AirPods를 벗으면")
-                .font(CheekyFont.text(14, weight: .bold))
-            HStack(spacing: 12) {
-                LossOption(title: "흐림 풀기", keeps: false, selected: !model.retainBlurOnInputLoss) {
-                    model.retainBlurOnInputLoss = false
-                }
-                LossOption(title: "계속 가리기", keeps: true, selected: model.retainBlurOnInputLoss) {
-                    model.retainBlurOnInputLoss = true
-                }
-            }
-        }
-    }
-}
-
-private struct LossOption: View {
-    let title: String
-    let keeps: Bool
-    let selected: Bool
-    let action: () -> Void
-
-    private let shape = RoundedRectangle(cornerRadius: 16)
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 14) {
-                LossIcon(keeps: keeps)
-                Text(title)
-                    .font(CheekyFont.text(14, weight: .semibold))
-                    .foregroundStyle(CheekyPalette.ink)
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 16)
-            .frame(maxWidth: .infinity, minHeight: 76)
-            .background(shape.fill(selected ? CheekyPalette.yellow : CheekyPalette.white))
-            .overlay(shape.stroke(CheekyPalette.cocoa, lineWidth: 2))
-            .background {
-                if selected {
-                    shape.fill(CheekyPalette.cocoa).offset(y: 3)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-}
-
-// 모니터 그림. keeps가 true면 가린 자리를 뜻하는 흐린 띠, false면 풀린 화면의 글줄을 그림.
-private struct LossIcon: View {
-    let keeps: Bool
-
-    var body: some View {
-        Canvas { context, size in
-            var scaled = context
-            scaled.concatenate(CGAffineTransform(scaleX: size.width / 58, y: size.height / 40))
-            let frame = Path(roundedRect: CGRect(x: 2, y: 2, width: 54, height: 30), cornerRadius: 5)
-            scaled.fill(frame, with: .color(CheekyPalette.white))
-            scaled.stroke(frame, with: .color(CheekyPalette.cocoa), lineWidth: 2.4)
-            let stand = StrokeStyle(lineWidth: 2.4, lineCap: .round)
-            var standPath = Path()
-            standPath.move(to: CGPoint(x: 23, y: 33))
-            standPath.addLine(to: CGPoint(x: 23, y: 37))
-            standPath.move(to: CGPoint(x: 17, y: 38))
-            standPath.addLine(to: CGPoint(x: 41, y: 38))
-            scaled.stroke(standPath, with: .color(CheekyPalette.cocoa), style: stand)
-            if keeps {
-                let blur = Path(roundedRect: CGRect(x: 8, y: 8, width: 38, height: 17), cornerRadius: 8.5)
-                scaled.fill(blur, with: .color(CheekyPalette.tan.opacity(0.5)))
-            } else {
-                var lines = Path()
-                lines.move(to: CGPoint(x: 9, y: 11))
-                lines.addLine(to: CGPoint(x: 31, y: 11))
-                lines.move(to: CGPoint(x: 9, y: 17))
-                lines.addLine(to: CGPoint(x: 43, y: 17))
-                lines.move(to: CGPoint(x: 9, y: 23))
-                lines.addLine(to: CGPoint(x: 25, y: 23))
-                scaled.stroke(lines, with: .color(CheekyPalette.cocoa), style: stand)
-            }
-        }
-        .frame(width: 52, height: 36)
-        .accessibilityHidden(true)
     }
 }
 

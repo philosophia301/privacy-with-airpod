@@ -53,11 +53,10 @@ struct ProtectionFlowTests {
     }
 
     /// 실측 2차처럼 입력이 1초 넘게 늦어도 끊김으로 보지 않음. 서서히 전체 블러로 덮고, 제때 온 입력이 다시 오면
-    /// 정면을 다시 맞추지 않고 바로 고개 따라가기로 돌아감. 기본 설정(입력이 끊기면 해제)에서도 보호가 꺼지지 않음.
+    /// 정면을 다시 맞추지 않고 바로 고개 따라가기로 돌아감. 끊김 기준 전이라 보호가 꺼지지 않음.
     @Test func lateInputFadesToFullBlurAndOnTimeInputReturnsWithoutRecalibrating() async throws {
         let h = try ProtectionHarness()
         defer { h.tearDown() }
-        #expect(!h.model.retainBlurOnInputLoss)
         let panel = try await h.protect()
         h.hold(right: 0, for: 0.5)
         let desk = try #require(h.model.deskReference)
@@ -130,11 +129,11 @@ struct ProtectionFlowTests {
         var testDescription: String { rawValue }
     }
 
-    @Test(arguments: InputLoss.allCases, [false, true])
-    func inputLossReleasesByDefaultOrKeepsFullBlurWhenOptedIn(_ loss: InputLoss, retain: Bool) async throws {
+    /// 입력이 끊기면 어떤 이유든 블러를 풀고 보호를 끔. 다시 착용해도 저절로 켜지지 않고 정면부터 다시 맞춤.
+    @Test(arguments: InputLoss.allCases)
+    func inputLossReleasesTheBlurAndNeedsRecalibration(_ loss: InputLoss) async throws {
         let h = try ProtectionHarness()
         defer { h.tearDown() }
-        h.model.retainBlurOnInputLoss = retain
         let panel = try await h.protect()
         h.hold(right: 0, for: 0.5)
 
@@ -156,26 +155,18 @@ struct ProtectionFlowTests {
 
         #expect(h.model.deskReference == nil)
         #expect(!h.model.canProtect)
-        guard retain else {
-            #expect(!h.model.protected)
-            #expect(!panel.isVisible)
-            #expect(h.model.protectionWindows.isEmpty)
-            return
-        }
-        #expect(h.model.protected && h.model.suspended)
-        #expect(panel.isVisible)
-        #expect(try h.maskAlpha(panel) == [255, 255, 255])
+        #expect(!h.model.protected && !h.model.suspended)
+        #expect(!panel.isVisible)
+        #expect(h.model.protectionWindows.isEmpty)
+        #expect(h.model.captureStatus == "입력 중단 · 블러 해제됨 · 재착용 후 정면 보정과 보호 시작이 필요함")
 
-        // 다시 착용해 입력이 돌아와도 보호를 끄고 재보정하기 전에는 가림을 풀지 않음.
+        // 다시 착용해 입력이 돌아와도 보호는 꺼진 채이고, 정면을 맞춰야 다시 켤 수 있음.
         h.model.startMotion()
         h.hold(right: 0, for: 1)
-        h.model.calibrateDesk()
-        #expect(h.model.deskReference == nil)
-        #expect(try h.maskAlpha(panel) == [255, 255, 255])
-
-        h.model.retainBlurOnInputLoss = false
         #expect(!h.model.protected)
-        #expect(!panel.isVisible)
+        #expect(!h.model.canProtect)
+        #expect(h.model.calibrateDesk())
+        #expect(h.model.canProtect)
     }
 
     @Test func screenChangeStopsProtectionAndKeepsLayoutOnlyForTheSameMonitorSet() async throws {
@@ -224,11 +215,9 @@ struct ProtectionFlowTests {
         #expect(h.model.protected && h.model.suspended)
         #expect(panel.isVisible)
 
-        // 값이 정상으로 돌아오거나 입력 중단 옵션을 바꿔도 비상 가림은 유지됨.
+        // 값이 정상으로 돌아와도 비상 가림은 유지됨.
         h.model.maximumBlur = 31.25
         h.hold(right: 0, for: 0.5)
-        h.model.retainBlurOnInputLoss = true
-        h.model.retainBlurOnInputLoss = false
         #expect(backdrop.emergencyCovered)
         #expect(h.model.protected)
         #expect(panel.isVisible)
