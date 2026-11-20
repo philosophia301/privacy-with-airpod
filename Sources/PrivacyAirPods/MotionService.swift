@@ -15,12 +15,16 @@ struct HeadSample: Sendable {
     /// 여유를 둔 값임(2026-11-20 사용자 결정). 그 사이의 늦은 입력은 끊김이 아니라 지연임.
     static let lossAge: TimeInterval = 2.5
 
-    /// 측정 시각과 도착 시각 중 더 오래된 쪽에서 지금까지 지난 초. 시각이 깨졌거나 지금보다 뒤면 nil.
+    /// AirPods 센서 시각이 Mac 시각보다 앞서도 받아 주는 폭(초). 실측 2차에서 표본 59개가 받은 시각보다
+    /// 최대 0.01초 앞선 센서 시각으로 왔음. 이 폭이 없으면 그 표본에서 입력 중단으로 보고 보호를 끔.
+    static let clockSkew: TimeInterval = 0.1
+
+    /// 측정 시각과 도착 시각 중 더 오래된 쪽에서 지금까지 지난 초. 시각이 깨졌거나 `clockSkew`보다 더 뒤면 nil.
     func age(at now: TimeInterval) -> TimeInterval? {
         let age = now - timestamp
         let deliveryAge = now - receivedAt
-        guard age.isFinite, age >= 0, deliveryAge.isFinite, deliveryAge >= 0 else { return nil }
-        return max(age, deliveryAge)
+        guard age.isFinite, age >= -Self.clockSkew, deliveryAge.isFinite, deliveryAge >= 0 else { return nil }
+        return max(0, age, deliveryAge)
     }
 
     /// 제때 온 입력임. 정면 맞추기는 이 입력에서만 하고, 보호 화면은 이 입력일 때만 고개를 그대로 따라감.

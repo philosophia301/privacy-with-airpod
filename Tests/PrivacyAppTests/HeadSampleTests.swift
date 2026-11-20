@@ -40,4 +40,14 @@ struct HeadSampleTests {
         #expect(sample.age(at: 11) == 1)
         #expect(sample.age(at: 9) == nil)
     }
+
+    /// 실측 2차에서 센서 시각이 받은 시각보다 최대 0.01초 앞섰음. 0.1초 안은 제때 온 입력으로 받고, 더 앞서면 깨진 시각으로 봄.
+    @Test func sensorClockSlightlyAheadOfTheMacIsStillOnTime() {
+        let ahead = HeadSample(timestamp: 10.01, receivedAt: 10, yaw: 0, acceleration: .zero, gravity: SIMD3(0, 0, -1), source: 0)
+        #expect(ahead.age(at: 10) == 0)
+        #expect(ahead.isFresh(at: 10) && ahead.isAlive(at: 10))
+        let broken = HeadSample(timestamp: 10.2, receivedAt: 10, yaw: 0, acceleration: .zero, gravity: SIMD3(0, 0, -1), source: 0)
+        #expect(broken.age(at: 10) == nil)
+        #expect(!broken.isAlive(at: 10))
+    }
 }

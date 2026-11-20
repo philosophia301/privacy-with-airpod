@@ -258,8 +258,29 @@ struct DataQuality: Codable {
     let droppedSamples: Int
     /// 표본의 이어버드가 바뀐 횟수임. 앱은 이때 입력 중단으로 보고 보정을 다시 요구하지만 replay는 판정을 이어감.
     let sourceChanges: Int
-    /// 받은 시각이 센서 시각보다 0.75초 넘게 늦거나 앞선 표본 수임. 앱은 이런 표본을 입력 중단으로 봄.
+    /// 받은 시각이 센서 시각보다 0.75초 넘게, 2.5초보다 덜 늦은 표본 수임. 앱은 이런 표본을 지연으로 봄.
     let lateSamples: Int
+    /// 받은 시각이 센서 시각보다 2.5초 넘게 늦거나 0.1초 넘게 앞선 표본 수임. 앱은 이런 표본을 입력 중단으로 봄.
+    let lostSamples: Int
+    /// 센서 시각이 받은 시각보다 앞섰지만 0.1초 안이라 앱이 받아 주는 표본 수임.
+    let aheadSamples: Int
+    /// 센서 시각이 받은 시각보다 가장 많이 앞선 초. 앞선 표본이 없으면 0.
+    let longestAhead: Double
+    /// 앱의 입력 나이(가장 새 표본의 센서 시각부터 지금까지)가 0.75초를 넘은 구간 수와 그 시간의 합임.
+    /// 앱은 이 동안 서서히 전체 블러로 덮음. 앱은 20Hz 주기로 확인하므로 실제 앱과 0.05초 안에서 다를 수 있음.
+    let delayEpisodes: Int
+    let delaySeconds: Double
+    /// 입력 나이의 최대값(초). 표본이 몰려 오기 전의 침묵을 포함함.
+    let longestAge: Double
+    /// 입력 나이가 2.5초에 닿은 횟수임. 앱은 이때 입력 중단으로 보고 정책대로 해제하거나 유지함.
+    let lossEpisodes: Int
+}
+
+/// 앱의 입력 나이 기준. `HeadSample.onTimeAge`, `lossAge`, `clockSkew`를 옮긴 값이며 앱을 바꾸면 함께 고침.
+enum InputAge {
+    static let onTime = 0.75
+    static let loss = 2.5
+    static let skew = 0.1
 }
 
 struct ReplayReport: Codable {
@@ -306,6 +327,17 @@ struct SeatAnalyzer {
     private var droppedSamples = 0
     private var sourceChanges = 0
     private var lateSamples = 0
+    private var lostSamples = 0
+    private var aheadSamples = 0
+    private var longestAhead = 0.0
+    /// 앱이 들고 있는 가장 새 표본의 센서 시각과 받은 시각 중 이른 쪽. 입력 나이는 지금에서 이 값을 뺀 것임.
+    private var inputBase: Double?
+    private var delayStart: Double?
+    private var delayEpisodes = 0
+    private var delaySeconds = 0.0
+    private var longestAge = 0.0
+    private var lossEpisodes = 0
+    private var lossInEpisode = false
 
     init(tuning: SeatPresence.Tuning = .init(), timing: AwayRule.Timing = .init()) {
         self.tuning = tuning
@@ -328,13 +360,17 @@ struct SeatAnalyzer {
             trackGap(rx)
             if let lastSource, source != lastSource { sourceChanges += 1 }
             lastSource = source
-            if rx - t > 0.75 || rx < t { lateSamples += 1 }
+            if rx - t >= InputAge.loss || t - rx > InputAge.skew { lostSamples += 1 }
+            else if rx - t >= InputAge.onTime { lateSamples += 1 }
+            else if rx < t { aheadSamples += 1 }
+            longestAhead = max(longestAhead, t - rx)
             // AppModel.receive처럼 센서 시각이 앞서지 않는 표본은 판정에 넣지 않음.
             if let lastTimestamp, t <= lastTimestamp {
                 droppedSamples += 1
                 return []
             }
             lastTimestamp = t
+            let ageNotes = trackAge(rx: rx, timestamp: t)
             let changes = rule.motion(now: rx, timestamp: t, acceleration: acceleration, gravity: gravity)
             let velocity = rule.measuredVelocity
             if var current = open {
@@ -343,7 +379,7 @@ struct SeatAnalyzer {
                 current.minVelocity = min(current.minVelocity ?? velocity, velocity)
                 open = current
             }
-            return record(changes, at: rx)
+            return ageNotes + record(changes, at: rx)
         case let .activity(rx, _, kinds, confidence):
             activityRows += 1
             let moving = AwayRule.isMoving(kinds: kinds, confidence: confidence)
@@ -356,15 +392,53 @@ struct SeatAnalyzer {
     /// 마지막 단계를 끝내고 보고를 만듦. 기록 끝 시각까지 주기 확인을 한 번 더 돌림.
     mutating func finish(at end: Double) -> ReplayReport {
         _ = record(rule.advance(to: end).map { [$0] } ?? [], at: end)
+        // 기록 끝의 침묵은 기록을 멈춘 것이므로 마지막 표본에서 지연 구간을 닫음.
+        if let start = delayStart, let lastMotion { delaySeconds += max(0, lastMotion - start) }
+        delayStart = nil
         close(at: end)
         let seconds = (lastMotion ?? 0) - (firstMotion ?? 0)
         let quality = DataQuality(motionSamples: motionSamples, seconds: seconds,
                                   rate: seconds > 0 ? Double(motionSamples - 1) / seconds : 0,
                                   gaps: gaps, longestGap: longestGap, activityRows: activityRows,
-                                  droppedSamples: droppedSamples, sourceChanges: sourceChanges, lateSamples: lateSamples)
+                                  droppedSamples: droppedSamples, sourceChanges: sourceChanges, lateSamples: lateSamples,
+                                  lostSamples: lostSamples, aheadSamples: aheadSamples, longestAhead: longestAhead, delayEpisodes: delayEpisodes, delaySeconds: delaySeconds,
+                                  longestAge: longestAge, lossEpisodes: lossEpisodes)
         var counts: [String: Int] = [:]
         for report in reports where report.verdict != .unchecked { counts[report.verdict.rawValue, default: 0] += 1 }
         return ReplayReport(tuning: Self.describe(tuning), timing: rule.timing, data: quality, steps: reports, counts: counts)
+    }
+
+    /// 판정에 넣는 표본마다 앱의 입력 나이를 따라감. 나이는 표본 사이에서 곧게 늘고, 새 표본이 오면 그 표본의 나이로 내려감.
+    /// 지연 시작과 앱 기준 중단은 단계 사건으로도 남겨 어느 동작에서 늦었는지 보이게 함.
+    private mutating func trackAge(rx: Double, timestamp t: Double) -> [Note] {
+        var notes: [Note] = []
+        // 앞 표본 뒤 침묵이 가장 길어진 때, 곧 이 표본이 오기 직전의 나이부터 봄.
+        for (base, age) in [inputBase.map { ($0, rx - $0) }, (min(t, rx), rx - min(t, rx))].compactMap({ $0 }) {
+            longestAge = max(longestAge, age)
+            if age >= InputAge.onTime, delayStart == nil {
+                let start = base + InputAge.onTime
+                delayStart = start
+                delayEpisodes += 1
+                notes += note("입력 지연", at: start)
+            }
+            if age >= InputAge.loss, !lossInEpisode {
+                lossInEpisode = true
+                lossEpisodes += 1
+                notes += note("입력 중단(앱 기준)", at: base + InputAge.loss)
+            }
+        }
+        inputBase = min(t, rx)
+        if t - rx > InputAge.skew {
+            // 앱은 센서 시각이 지금보다 0.1초 넘게 뒤인 표본을 입력 중단으로 봄. 나이로는 잴 수 없어 횟수만 셈.
+            lossEpisodes += 1
+            notes += note("입력 중단(앱 기준)", at: rx)
+        }
+        if rx - min(t, rx) < InputAge.onTime, let start = delayStart {
+            delaySeconds += rx - start
+            delayStart = nil
+            lossInEpisode = false
+        }
+        return notes
     }
 
     private mutating func trackGap(_ rx: Double) {
@@ -476,9 +550,13 @@ enum ReportText {
         let data = report.data
         lines.append("기록 \(source): 표본 \(data.motionSamples)개, \(fixed(data.rate, 1))Hz, \(fixed(data.seconds, 1))초, "
                      + "\(fixed(report.tuning["maximumGap"] ?? 0, 2))초 넘는 끊김 \(data.gaps)번(최장 \(fixed(data.longestGap, 2))초), 걷기 판정 행 \(data.activityRows)개")
-        if data.droppedSamples + data.sourceChanges + data.lateSamples > 0 {
+        lines.append("입력 나이: 가장 늦을 때 \(fixed(data.longestAge, 2))초, 지연 \(data.delayEpisodes)번(합 \(fixed(data.delaySeconds, 1))초), "
+                     + "앱 기준 중단 \(data.lossEpisodes)번. 앱은 지연 동안 전체 블러로 덮고 중단이면 정책대로 해제하거나 유지함")
+        if data.droppedSamples + data.sourceChanges + data.lateSamples + data.lostSamples + data.aheadSamples > 0 {
             lines.append("입력 주의: 센서 시각이 앞서지 않아 버린 표본 \(data.droppedSamples)개, 이어버드 바뀜 \(data.sourceChanges)번, "
-                         + "0.75초 넘게 늦은 표본 \(data.lateSamples)개. 앱은 이어버드 바뀜과 늦은 표본을 입력 중단으로 보지만 replay는 판정을 이어감")
+                         + "0.75초 넘게 늦은 표본 \(data.lateSamples)개, 2.5초 넘게 늦거나 0.1초 넘게 앞선 표본 \(data.lostSamples)개, "
+                         + "0.1초 안에서 앞선 표본 \(data.aheadSamples)개, 가장 많이 앞선 센서 시각 \(fixed(data.longestAhead, 3))초. "
+                         + "앱은 이어버드 바뀜과 2.5초 넘은 표본을 입력 중단으로 보지만 replay는 판정을 이어감")
         }
         let tuning = TuningFlag.all.map { "\($0.flag) \(fixed(report.tuning[$0.name] ?? 0, 3))" }.joined(separator: " ")
         lines.append("기준 \(tuning) --standing-delay \(fixed(report.timing.standingDelay, 2)) --return-settle \(fixed(report.timing.returnSettle, 2))")

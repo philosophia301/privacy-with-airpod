@@ -144,6 +144,57 @@ class SeatRecorderTest(unittest.TestCase):
         text = self.run_tool("replay", path).stdout
         self.assertIn("입력 주의: 센서 시각이 앞서지 않아 버린 표본 1개, 이어버드 바뀜 2번", text)
 
+    def test_input_age_is_measured_like_the_app(self):
+        lines = self.recording.read_text().splitlines()
+        motion = [i for i, line in enumerate(lines) if line.startswith("m,")]
+
+        def window(size, after):
+            # 단계 행이 끼지 않은 움직임 행 묶음을 고름. 행 순서가 받은 시각 순서여야 replay가 받아 줌.
+            start = after
+            while motion[start + size] - motion[start - 1] != size + 1:
+                start += 1
+            return start
+
+        def field(index, column):
+            return float(lines[motion[index]].split(",")[column])
+
+        def set_field(index, column, value):
+            fields = lines[motion[index]].split(",")
+            fields[column] = repr(value)
+            lines[motion[index]] = ",".join(fields)
+
+        # 합성 기록은 25Hz이고 받은 시각이 센서 시각보다 0.02초 늦음. 묶음을 다음 표본 0.015초 전에 한꺼번에 받게 하면
+        # 묶음 앞의 침묵 끝 나이는 (묶음 크기 + 1) * 0.04 + 0.005초이고, 묶음 안 표본의 나이는 k * 0.04 + 0.005초(k = 1..크기)임.
+        delayed = window(30, 100)
+        lost = window(75, delayed + 200)
+        for start, size in ((delayed, 30), (lost, 75)):
+            burst = field(start + size, 1) - 0.015
+            for index in range(start, start + size):
+                set_field(index, 1, burst)
+        # 센서 시각이 0.01초 앞선 표본은 받아 주고, 0.2초 앞선 표본은 앱처럼 중단으로 셈. 그 뒤 5개는 센서 시각이 앞서지 않아 버림.
+        ahead, broken = lost + 200, lost + 400
+        set_field(ahead, 2, field(ahead, 1) + 0.01)
+        set_field(broken, 2, field(broken, 1) + 0.2)
+        path = self.dir / "input-age.csv"
+        path.write_text("\n".join(lines) + "\n")
+
+        result = self.run_tool("replay", path, "--json")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout)
+        data = report["data"]
+        self.assertEqual((data["delayEpisodes"], data["lossEpisodes"]), (2, 2))
+        self.assertAlmostEqual(data["longestAge"], 3.045, delta=0.001)
+        # 지연은 나이가 0.75초에 닿은 때부터 묶음을 받은 때까지임: (1.245 - 0.75) + (3.045 - 0.75)
+        self.assertAlmostEqual(data["delaySeconds"], 2.79, delta=0.002)
+        self.assertEqual((data["lateSamples"], data["lostSamples"], data["aheadSamples"]), (12 + 44, 13 + 1, 1))
+        self.assertEqual(data["droppedSamples"], 5)
+        self.assertAlmostEqual(data["longestAhead"], 0.2, delta=0.001)
+        events = [event["kind"] for step in report["steps"] for event in step["events"]]
+        self.assertEqual((events.count("입력 지연"), events.count("입력 중단(앱 기준)")), (2, 2))
+        text = self.run_tool("replay", path).stdout
+        self.assertRegex(text, r"입력 나이: 가장 늦을 때 3\.0\d초, 지연 2번\(합 2\.8초\), 앱 기준 중단 2번")
+        self.assertIn("0.1초 안에서 앞선 표본 1개", text)
+
     def test_malformed_recordings_are_rejected(self):
         lines = self.recording.read_text().splitlines()
         cases = {

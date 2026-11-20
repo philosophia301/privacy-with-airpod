@@ -93,6 +93,24 @@ struct ProtectionFlowTests {
         #expect(h.model.deskReference == desk)
     }
 
+    /// 실측 2차의 표본 59개처럼 센서 시각이 Mac 시각보다 조금 앞서도 입력 중단으로 보지 않음. 기본 설정이면 보호가 꺼졌던 경우임.
+    @Test func sensorClockSlightlyAheadKeepsProtection() async throws {
+        let h = try ProtectionHarness()
+        defer { h.tearDown() }
+        let panel = try await h.protect()
+        h.hold(right: 0, for: 0.5)
+        let desk = try #require(h.model.deskReference)
+        for _ in 0..<10 {
+            h.look(right: 0, measuredAgo: -0.01)
+            h.clock.advance()
+        }
+        #expect(h.model.protected && !h.model.suspended)
+        #expect(h.model.deskReference == desk)
+        #expect(try h.maskAlpha(panel) == [0, 0, 0])
+        h.hold(right: 45)
+        #expect(try h.maskAlpha(panel) == [255, 255, 0])
+    }
+
     @Test func lateInputCannotSetTheDeskReference() throws {
         let h = try ProtectionHarness()
         defer { h.tearDown() }
