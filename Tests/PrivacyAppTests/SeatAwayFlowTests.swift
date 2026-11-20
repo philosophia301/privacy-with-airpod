@@ -278,7 +278,7 @@ struct SeatAwayFlowTests {
             h.motion.fail("AirPods 연결 끊김")
             h.clock.advance()
         case .silence:
-            for _ in 0..<16 { h.clock.advance() }
+            h.fallSilent()
         }
     }
 

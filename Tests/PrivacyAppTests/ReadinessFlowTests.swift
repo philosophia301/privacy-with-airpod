@@ -65,7 +65,7 @@ struct ReadinessFlowTests {
         defer { h.tearDown() }
         try await h.protect()
         // 기본 정책은 입력이 끊기면 보호를 풀고, 배치는 실험 실행 중 그대로 남김.
-        for _ in 0..<16 { h.clock.advance() }
+        h.fallSilent()
         #expect(!h.model.protected)
         let items = h.model.readinessItems
         #expect(items.map(\.state) == [.todo, .wait, .done])
@@ -83,7 +83,7 @@ struct ReadinessFlowTests {
         #expect(!h.model.demo)
 
         // AirPods를 빼 sample이 끊기면 정면 기준이 사라짐. AirPods 보기는 고를 수 없으므로 직접 돌려보기로 돌아옴.
-        for _ in 0..<16 { h.clock.advance() }
+        h.fallSilent()
         #expect(h.model.deskReference == nil)
         #expect(h.model.demo)
 

@@ -52,6 +52,61 @@ struct ProtectionFlowTests {
         #expect(h.model.protected)
     }
 
+    /// 실측 2차처럼 입력이 1초 넘게 늦어도 끊김으로 보지 않음. 서서히 전체 블러로 덮고, 제때 온 입력이 다시 오면
+    /// 정면을 다시 맞추지 않고 바로 고개 따라가기로 돌아감. 기본 설정(입력이 끊기면 해제)에서도 보호가 꺼지지 않음.
+    @Test func lateInputFadesToFullBlurAndOnTimeInputReturnsWithoutRecalibrating() async throws {
+        let h = try ProtectionHarness()
+        defer { h.tearDown() }
+        #expect(!h.model.retainBlurOnInputLoss)
+        let panel = try await h.protect()
+        h.hold(right: 0, for: 0.5)
+        let desk = try #require(h.model.deskReference)
+        #expect(try h.maskAlpha(panel) == [0, 0, 0])
+
+        // 0.75초가 지나기 전에는 제때 온 입력임.
+        for _ in 0..<13 { h.clock.advance() }
+        #expect(try h.maskAlpha(panel) == [0, 0, 0])
+        #expect(h.model.motionStatus.hasPrefix("입력 수신 중"))
+
+        // 늦은 지 0.2초면 가림이 옮겨 가는 중이고, 0.5초가 지나면 전체 블러임.
+        for _ in 0..<5 { h.clock.advance() }
+        let fading = try h.maskAlpha(panel)
+        #expect(fading.allSatisfy { $0 > 0 && $0 < 255 })
+        #expect(h.model.motionStatus.hasPrefix("입력 지연"))
+        for _ in 0..<8 { h.clock.advance() }
+        #expect(try h.maskAlpha(panel) == [255, 255, 255])
+
+        // 밀렸던 표본이 1초 가까이 늦게 도착해도 끊김이 아니라 지연으로 봄.
+        h.look(right: 0, measuredAgo: 0.9)
+        h.clock.advance()
+        #expect(try h.maskAlpha(panel) == [255, 255, 255])
+        #expect(h.model.protected && !h.model.suspended)
+        #expect(h.model.deskReference == desk)
+
+        // 제때 온 입력 하나로 다음 주기에 바로 고개 따라가기로 돌아감.
+        h.look(right: 0)
+        h.clock.advance()
+        #expect(try h.maskAlpha(panel) == [0, 0, 0])
+        #expect(h.model.motionStatus.hasPrefix("입력 수신 중"))
+        h.hold(right: 45)
+        #expect(try h.maskAlpha(panel) == [255, 255, 0])
+        #expect(h.model.deskReference == desk)
+    }
+
+    @Test func lateInputCannotSetTheDeskReference() throws {
+        let h = try ProtectionHarness()
+        defer { h.tearDown() }
+        h.model.startMotion()
+        h.look(right: 0)
+        for _ in 0..<16 { h.clock.advance() }
+        // 늦은 입력의 각도는 지금 고개와 다를 수 있음. AirPods는 연결된 것으로 보이지만 정면은 맞추지 않음.
+        #expect(h.model.readinessItems[0].state == .done)
+        #expect(!h.model.calibrateDesk())
+        #expect(h.model.deskReference == nil)
+        h.look(right: 0)
+        #expect(h.model.calibrateDesk())
+    }
+
     enum InputLoss: String, CaseIterable, CustomTestStringConvertible {
         case silence, sensorError, earbudSwitch, staleSample, sleep, stopInput
         var testDescription: String { rawValue }
@@ -67,13 +122,13 @@ struct ProtectionFlowTests {
 
         switch loss {
         case .silence:
-            for _ in 0..<16 { h.clock.advance() }
+            h.fallSilent()
         case .sensorError:
             h.motion.fail("AirPods 연결 끊김")
         case .earbudSwitch:
             h.look(right: 0, source: 2)
         case .staleSample:
-            h.look(right: 0, measuredAgo: 1)
+            h.look(right: 0, measuredAgo: 3)
         case .sleep:
             h.workspace.post(name: NSWorkspace.willSleepNotification, object: nil)
             #expect(!h.motion.running)
@@ -207,7 +262,7 @@ struct ProtectionFlowTests {
         h.model.calibrateDesk()
         #expect(h.model.canProtect)
         // 보정 뒤 입력이 끊기면 다시 거부함.
-        for _ in 0..<16 { h.clock.advance() }
+        h.fallSilent()
         await expectRefused()
     }
 

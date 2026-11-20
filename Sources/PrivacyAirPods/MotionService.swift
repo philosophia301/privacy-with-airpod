@@ -9,17 +9,30 @@ struct HeadSample: Sendable {
     let gravity: SIMD3<Double>
     let source: Int
 
-    func isFresh(at now: TimeInterval) -> Bool {
-        freshnessRemaining(at: now) > 0
-    }
+    /// 이보다 덜 된 입력은 제때 온 것으로 봄(초). 넘으면 늦은 입력으로 보고 보호 화면을 서서히 전체 블러로 덮음.
+    static let onTimeAge: TimeInterval = 0.75
+    /// 이만큼 새 입력이 없으면 입력이 끊긴 것으로 봄(초). 실측 2차에서 표본이 최대 1.71초 늦게 왔으므로
+    /// 여유를 둔 값임(2026-11-20 사용자 결정). 그 사이의 늦은 입력은 끊김이 아니라 지연임.
+    static let lossAge: TimeInterval = 2.5
 
-    /// 센서가 침묵해도 기존 유효 기간의 끝에서 다시 확인할 수 있게 함.
-    func freshnessRemaining(at now: TimeInterval) -> TimeInterval {
+    /// 측정 시각과 도착 시각 중 더 오래된 쪽에서 지금까지 지난 초. 시각이 깨졌거나 지금보다 뒤면 nil.
+    func age(at now: TimeInterval) -> TimeInterval? {
         let age = now - timestamp
         let deliveryAge = now - receivedAt
-        guard age.isFinite, age >= 0, deliveryAge.isFinite, deliveryAge >= 0 else { return 0 }
-        return max(0, 0.75 - max(age, deliveryAge))
+        guard age.isFinite, age >= 0, deliveryAge.isFinite, deliveryAge >= 0 else { return nil }
+        return max(age, deliveryAge)
     }
+
+    /// 제때 온 입력임. 정면 맞추기는 이 입력에서만 하고, 보호 화면은 이 입력일 때만 고개를 그대로 따라감.
+    func isFresh(at now: TimeInterval) -> Bool { freshnessRemaining(at: now) > 0 }
+
+    /// 제때 온 입력으로 남은 초. Blur Lab 진단 앱이 이 끝에서 다시 확인함.
+    func freshnessRemaining(at now: TimeInterval) -> TimeInterval {
+        age(at: now).map { max(0, Self.onTimeAge - $0) } ?? 0
+    }
+
+    /// 늦었어도 아직 끊김으로 보지 않는 입력임.
+    func isAlive(at now: TimeInterval) -> Bool { age(at: now).map { $0 < Self.lossAge } ?? false }
 }
 
 /// AppModel이 받는 머리 동작 입력. 실제 앱은 MotionService, 테스트는 합성 입력을 씀.

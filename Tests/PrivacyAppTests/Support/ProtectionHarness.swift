@@ -139,6 +139,11 @@ final class ProtectionHarness {
         defaults.removePersistentDomain(forName: suiteName)
     }
 
+    /// 새 sample 없이 갱신 주기를 보내 입력이 끊김 기준(`HeadSample.lossAge`)을 넘기게 함.
+    func fallSilent() {
+        for _ in 0...Int((HeadSample.lossAge / 0.05).rounded()) { clock.advance() }
+    }
+
     /// 사용자 기준 오른쪽으로 degrees만큼 돌린 머리 방향의 sample 하나를 보냄.
     /// CoreMotion yaw는 위에서 볼 때 왼쪽 회전이 양수이므로 부호를 바꿔 보냄.
     func look(right degrees: Double, source: Int = 1, measuredAgo age: TimeInterval = 0) {

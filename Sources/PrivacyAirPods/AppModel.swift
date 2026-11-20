@@ -97,6 +97,8 @@ final class AppModel: ObservableObject {
     private var standingSince: TimeInterval?
     /// 고개 따라가기(0)와 최대 블러(1) 사이의 가림 정도. 자리 비움 전환을 한 번에 바꾸지 않으려고 씀.
     private var awayCoverage = 0.0
+    /// 늦은 입력으로 덮는 가림 정도. 자리 비움과 같은 시간으로 서서히 덮고, 제때 온 입력이 다시 오면 바로 0이 됨.
+    private var lateCoverage = 0.0
     /// 이 시각 전의 걷기 활동은 무시함. 앉은 직후 늦게 도착한 걷기 callback이 자리 비움을 되살려 앉은 사용자를 가두는 것을 막음.
     private var movingIgnoredUntil: TimeInterval = 0
 
@@ -159,13 +161,20 @@ final class AppModel: ObservableObject {
 
     var protectionWindows: [NSPanel] { cover.outputWindows }
 
-    var fresh: Bool {
+    /// 입력이 끊기지 않음. 늦게 온 입력도 끊김 기준(`HeadSample.lossAge`) 전이면 살아 있는 것으로 봄.
+    var inputAlive: Bool {
         guard let sample else { return false }
-        return receiving && sample.isFresh(at: clock.now)
+        return receiving && sample.isAlive(at: clock.now)
+    }
+
+    /// 입력이 살아 있지만 제때 오지 않음. 이 동안 보호 화면을 서서히 전체 블러로 덮음.
+    var inputLate: Bool {
+        guard let sample else { return false }
+        return inputAlive && !sample.isFresh(at: clock.now)
     }
 
     var canProtect: Bool {
-        fresh && deskReference != nil && appliedLayout != nil && !startingProtection
+        inputAlive && deskReference != nil && appliedLayout != nil && !startingProtection
     }
 
     /// 설정 화면 준비 항목. 실제 상태에서 매번 계산하며 저장하지 않음.
@@ -174,7 +183,7 @@ final class AppModel: ObservableObject {
     var heroMood: HeroMood { Readiness.mood(readinessSnapshot) }
 
     private var readinessSnapshot: ReadinessSnapshot {
-        ReadinessSnapshot(fresh: fresh, motionAccessDenied: motionAccessDenied,
+        ReadinessSnapshot(fresh: inputAlive, motionAccessDenied: motionAccessDenied,
                           deskCalibrated: deskReference != nil, layoutApplied: appliedLayout != nil,
                           screenCount: displays.count, locked: protected || startingProtection)
     }
@@ -195,9 +204,10 @@ final class AppModel: ObservableObject {
     }
 
     /// 실제로 정면을 맞췄을 때만 true를 돌려줌. 화면의 cheer는 이 값으로만 켬.
+    /// 늦게 온 입력의 각도는 지금 고개와 다를 수 있으므로 제때 온 입력에서만 맞춤.
     @discardableResult
     func calibrateDesk() -> Bool {
-        guard fresh, let sample, !protected, !startingProtection else { return false }
+        guard inputAlive, !inputLate, let sample, !protected, !startingProtection else { return false }
         deskReference = sample.yaw
         filteredYaw = sample.yaw
         demo = false
@@ -231,7 +241,7 @@ final class AppModel: ObservableObject {
             captureStatus = "보호 중"
             beginAwayWatch()
             reconcileTicking()
-            if !fresh { invalidateMotion("AirPods 입력 중단") }
+            if !inputAlive { invalidateMotion("AirPods 입력 중단") }
         } catch {
             guard attempt == request else { return }
             startingProtection = false
@@ -253,6 +263,7 @@ final class AppModel: ObservableObject {
         away = false
         standingSince = nil
         awayCoverage = 0
+        lateCoverage = 0
         reconcileTicking()
         cover.stop()
     }
@@ -317,20 +328,20 @@ final class AppModel: ObservableObject {
         return true
     }
 
-    /// previewAngle이 없으면 실제 보호용 값임. 보정, 배치, 신선한 입력 중 하나라도 없으면 전체를 가림.
+    /// previewAngle이 없으면 실제 보호용 값임. 보정, 배치, 끊기지 않은 입력 중 하나라도 없으면 전체를 가림.
     func settingsByDisplay(previewAngle: Double? = nil) -> [CGDirectDisplayID: RenderSettings] {
         let live = previewAngle == nil
         let gaze = previewAngle ?? liveGaze
         return Dictionary(uniqueKeysWithValues: displays.map { display in
             guard let layout = appliedLayout, let table = layout.displays[display.id], let gaze,
-                  !(live && (suspended || !fresh)) else {
+                  !(live && (suspended || !inputAlive)) else {
                 return (display.id, RenderSettings.covered(radius: maximumBlur))
             }
             var settings = RenderSettings.spatial(table, in: layout, gaze: gaze, start: startAngle,
                                                   transitionFraction: connectionWidth / 100,
                                                   radius: maximumBlur)
-            // 자리 비움 가림은 실제 보호 값에만 씀. 미리보기 각도는 고개 값만 보여 줌.
-            if live { settings.coverage = awayCoverage }
+            // 자리 비움과 늦은 입력의 가림은 실제 보호 값에만 씀. 미리보기 각도는 고개 값만 보여 줌.
+            if live { settings.coverage = max(awayCoverage, lateCoverage) }
             return (display.id, settings)
         })
     }
@@ -344,11 +355,12 @@ final class AppModel: ObservableObject {
         let now = clock.now
         let dt = min(0.2, max(0, now - lastTick))
         lastTick = now
-        if receiving && !fresh { invalidateMotion("입력이 끊김 — 연결과 착용을 확인해 주세요") }
-        if fresh, let yaw = sample?.yaw {
+        if receiving && !inputAlive { invalidateMotion("입력이 끊김 — 연결과 착용을 확인해 주세요") }
+        if inputAlive, let yaw = sample?.yaw {
             let alpha = 1 - exp(-dt / max(0.03, responseTime))
             filteredYaw = BlurProfile.interpolatedDegrees(from: filteredYaw ?? yaw, to: yaw, fraction: alpha)
         }
+        advanceLate(dt: dt)
         advanceAway(dt: dt, now: now)
         if previewWindowVisible { renderPreview() }
         if protected || startingProtection { updateCovers() }
@@ -366,7 +378,7 @@ final class AppModel: ObservableObject {
     }
 
     private func receive(_ value: HeadSample) {
-        guard value.isFresh(at: clock.now) else { invalidateMotion("오래되었거나 유효하지 않은 센서 입력"); return }
+        guard value.isAlive(at: clock.now) else { invalidateMotion("오래되었거나 유효하지 않은 센서 입력"); return }
         guard value.yaw.isFinite, value.timestamp.isFinite else { invalidateMotion("유효하지 않은 센서 입력"); return }
         if let previous = sample {
             if value.source != previous.source { invalidateMotion("이어버드 입력이 바뀜 — 기준을 다시 맞춰 주세요") }
@@ -378,8 +390,22 @@ final class AppModel: ObservableObject {
         reconcileTicking()
         readout.sampleCount += 1
         refreshAngle()
-        let status = "입력 수신 중 · 이어버드 \(value.source)"
+        refreshMotionStatus()
+    }
+
+    /// 입력이 살아 있는 동안의 상태 문구. 끊김 문구는 `invalidateMotion`이 씀.
+    private func refreshMotionStatus() {
+        guard receiving, let sample else { return }
+        let status = !inputLate ? "입력 수신 중 · 이어버드 \(sample.source)"
+            : protected ? "입력 지연 · 전체 블러로 덮음 · 제때 들어오면 돌아옴"
+            : "입력 지연 · 이어버드 \(sample.source)"
         if motionStatus != status { motionStatus = status }
+    }
+
+    /// 늦은 입력은 끊김 기준 전까지 가림을 서서히 올림. 제때 온 입력이 다시 오면 정면 기준을 그대로 두고 바로 고개 따라가기로 돌아감.
+    private func advanceLate(dt: Double) {
+        lateCoverage = inputLate ? min(1, lateCoverage + dt / AwayTiming.fadeDuration) : 0
+        refreshMotionStatus()
     }
 
     private func invalidateMotion(_ message: String) {
@@ -389,6 +415,7 @@ final class AppModel: ObservableObject {
         motionAccessDenied = message == MotionService.accessDeniedMessage
         deskReference = nil
         filteredYaw = nil
+        lateCoverage = 0
         refreshAngle()
         reconcileTicking()
         guard protected || startingProtection else { return }

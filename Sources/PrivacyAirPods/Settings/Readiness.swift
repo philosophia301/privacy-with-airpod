@@ -33,7 +33,7 @@ enum HeroMood: Equatable {
 
 /// 준비 규칙이 읽는 실제 상태 묶음. 계산은 이 값만 보고 하며 상태를 저장하지 않음.
 struct ReadinessSnapshot: Equatable {
-    /// AirPods 입력이 신선함.
+    /// AirPods 입력이 끊기지 않음. 늦게 온 입력도 끊김 기준 전이면 연결된 것으로 봄.
     var fresh: Bool
     /// 동작 접근이 시스템에서 거절됨.
     var motionAccessDenied: Bool
