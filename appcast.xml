@@ -6,6 +6,14 @@
     <description>Privacy AirPods 업데이트. scripts/publish-update.py가 항목을 추가함.</description>
     <language>ko</language>
     <item>
+      <title>0.1.6</title>
+      <pubDate>Fri, 20 Nov 2026 20:42:56 +0900</pubDate>
+      <sparkle:version>7</sparkle:version>
+      <sparkle:shortVersionString>0.1.6</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <enclosure url="https://github.com/philosophia301/privacy-with-airpod/releases/download/v0.1.6/Privacy-AirPods-0.1.6.dmg" length="34521723" type="application/octet-stream" sparkle:edSignature="/Uv5Zv03obFeHpZB5T/U3BczXkWMK+YuBcnPt1XNBNJ2t1u2qydcl4Bbqnxq6K/0iZ9OXA7ZQrIs+Lms0NltCw==" />
+    </item>
+    <item>
       <title>0.1.5</title>
       <pubDate>Thu, 12 Nov 2026 23:37:53 +0900</pubDate>
       <sparkle:version>6</sparkle:version>
