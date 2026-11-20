@@ -21,6 +21,10 @@ enum ProtectionSmokeTest {
         guard failure == nil, cover.maskUpdateCount == 1 else {
             return report("마스크 갱신 실패: \(failure ?? "제출 \(cover.maskUpdateCount)회")")
         }
+        if Bundle.main.bundleURL.pathExtension == "app",
+           (panel.contentView as? SpaceTransitionBackdrop)?.showsSwim != true {
+            return report("부분 가림에서 번들의 헤엄 리소스가 보이지 않음")
+        }
         cover.stop()
         guard !panel.isVisible, cover.outputWindows.isEmpty else { return report("가림 창이 닫히지 않음") }
         print("smoke-test OK display=\(screen.displayID)")

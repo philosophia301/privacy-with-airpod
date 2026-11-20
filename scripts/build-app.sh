@@ -5,6 +5,11 @@ cd "$(dirname "$0")/.."
 configuration="${BUILD_CONFIGURATION:-debug}"
 dev_app_dir="$PWD/.build/Privacy AirPods.app"
 app_dir="${APP_DIR:-$dev_app_dir}"
+swim_art="${SWIM_ART:-Resources/Swim/swim.tiff}"
+if [[ ! -s "$swim_art" ]]; then
+    printf '헤엄 그림 파일을 찾지 못함: %s\n' "$swim_art" >&2
+    exit 1
+fi
 signing_identity="${CODE_SIGN_IDENTITY:-}"
 if [[ -z "$signing_identity" && -f .build/signing-identity ]]; then
     signing_identity="$(cat .build/signing-identity)"
@@ -54,6 +59,10 @@ mkdir -p "$app_dir/Contents/Resources/Character"
 for pose in "${character_poses[@]}"; do
     cp "Resources/Character/$pose.png" "$app_dir/Contents/Resources/Character/$pose.png"
 done
+# 센서와 가림 코드는 그대로 두고 빌드에 넣을 그림 한 개만 교체할 수 있음.
+mkdir -p "$app_dir/Contents/Resources/Swim"
+cp "$swim_art" "$app_dir/Contents/Resources/Swim/swim.tiff"
+rm -f "$app_dir/Contents/Resources/Swim/left.png" "$app_dir/Contents/Resources/Swim/right.png"
 # 설정 창 글꼴(Bagel Fat One, SIL OFL 1.1). 라이선스 문서를 글꼴과 함께 넣어야 재배포 조건을 지킴.
 for font in BagelFatOne-Regular.ttf BagelFatOne-OFL.txt; do
     if [[ ! -f "Resources/Fonts/$font" ]]; then

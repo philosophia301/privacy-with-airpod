@@ -41,7 +41,11 @@ public struct DisplayPose: Sendable, Equatable {
             guard worldX.isFinite, worldZ.isFinite, worldZ > 1 else { return nil }
             angles.append(atan2(worldX, worldZ) * 180 / .pi)
         }
-        return CompiledDisplayAngles(id: id, angles: angles)
+        // 화면 가운데까지의 수평 거리에서 위아래 끝을 올려본 각도. 헤엄 치키가 화면 사이를 같은 높이로 넘을 때 씀.
+        let reach = hypot(x, z)
+        let bottom = atan2(y - height / 2, reach) * 180 / .pi
+        let top = atan2(y + height / 2, reach) * 180 / .pi
+        return CompiledDisplayAngles(id: id, angles: angles, elevation: bottom...top)
     }
 }
 
@@ -50,12 +54,15 @@ public struct CompiledDisplayAngles: Sendable, Equatable {
     public let angles: [Double]
     public let minimumAngle: Double
     public let maximumAngle: Double
+    /// 화면 아래 끝과 위 끝을 올려본 각도(도). 자세에서 만들지 않은 표는 없음.
+    public let elevation: ClosedRange<Double>?
     private let valid: Bool
 
-    public init(id: UInt32, angles: [Double]) {
+    public init(id: UInt32, angles: [Double], elevation: ClosedRange<Double>? = nil) {
         self.id = id
         self.valid = angles.count >= 2 && angles.allSatisfy(\.isFinite)
         self.angles = angles
+        self.elevation = elevation.flatMap { $0.lowerBound.isFinite && $0.upperBound.isFinite ? $0 : nil }
         self.minimumAngle = angles.min() ?? .nan
         self.maximumAngle = angles.max() ?? .nan
     }

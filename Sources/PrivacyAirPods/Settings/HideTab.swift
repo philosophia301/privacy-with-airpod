@@ -95,10 +95,11 @@ private struct MonitorPreview: View {
         VStack(spacing: 0) {
             ZStack {
                 RoundedRectangle(cornerRadius: 9).fill(Color(cheekyHex: 0xFFFCF4))
-                if let image = readout.previewImage {
-                    Image(image, scale: 1, label: Text("앱이 만든 예제 화면의 블러 미리보기"))
-                        .resizable()
+                if let frame = readout.previewFrame {
+                    SwimExample(frame: frame)
                         .clipShape(RoundedRectangle(cornerRadius: 9))
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("앱이 만든 예제 화면의 헤엄 가림 미리보기")
                 }
             }
             .frame(width: Self.screenHeight * 800 / 420, height: Self.screenHeight)
@@ -114,6 +115,49 @@ private struct MonitorPreview: View {
                 .frame(width: 120, height: 7)
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+private struct SwimExample: NSViewRepresentable {
+    let frame: PreviewRenderer.Frame
+    func makeNSView(context: Context) -> ExampleView { ExampleView() }
+    func updateNSView(_ view: ExampleView, context: Context) { view.show(frame) }
+
+    final class ExampleView: NSView {
+        private let swim = SwimOverlay()
+        private var current: RenderSettings?
+
+        init() {
+            super.init(frame: .zero)
+            wantsLayer = true
+            layer?.contentsGravity = .resize
+            if let swim { layer?.addSublayer(swim.layer) }
+        }
+
+        required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+        func show(_ frame: PreviewRenderer.Frame) {
+            CATransaction.begin(); CATransaction.setDisableActions(true)
+            layer?.contents = frame.image
+            current = frame.settings
+            if window != nil { swim?.update(settings: frame.settings, size: bounds.size) }
+            CATransaction.commit()
+        }
+
+        override func layout() {
+            super.layout()
+            if let current, window != nil { swim?.update(settings: current, size: bounds.size) }
+        }
+
+        /// 설정 창을 닫아도 보기가 남을 수 있어 물 시계를 놓음.
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if window == nil {
+                swim?.suspend()
+            } else if let current {
+                swim?.update(settings: current, size: bounds.size)
+            }
+        }
     }
 }
 

@@ -12,6 +12,18 @@ import Testing
     #expect(display.maximumAngle == display.angles[2])
 }
 
+@Test func elevationLooksUpFromTheHorizontalDistanceToTheScreenCenter() throws {
+    let level = try #require(DisplayPose(id: 1, width: 40, height: 25, x: 0, y: 0, z: 60, yawDegrees: 0).compiled())
+    let half = atan(12.5 / 60) * 180 / .pi
+    #expect(abs(try #require(level.elevation).lowerBound + half) < 1e-12)
+    #expect(abs(try #require(level.elevation).upperBound - half) < 1e-12)
+    let low = try #require(DisplayPose(id: 2, width: 30, height: 20, x: -45, y: -15, z: 60, yawDegrees: 0).compiled())
+    let reach = (45.0 * 45 + 60 * 60).squareRoot()
+    #expect(abs(try #require(low.elevation).lowerBound - atan2(-25, reach) * 180 / .pi) < 1e-12)
+    #expect(abs(try #require(low.elevation).upperBound - atan2(-5, reach) * 180 / .pi) < 1e-12)
+    #expect(CompiledDisplayAngles(id: 3, angles: [0, 1], elevation: -.infinity...0).elevation == nil)
+}
+
 @Test func yawRotatesScreenEndpointsInWorldCoordinates() throws {
     let display = try #require(DisplayPose(id: 1, width: 20, height: 10, x: 0, y: 0, z: 50,
                                            yawDegrees: 30).compiled(sampleCount: 3))

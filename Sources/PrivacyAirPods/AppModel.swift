@@ -10,7 +10,7 @@ final class LiveReadout: ObservableObject {
     @Published fileprivate(set) var sampleCount = 0
     /// 책상 정면 기준 현재 고개 각도(도). 오른쪽 회전이 양수이며 보정 전에는 0임.
     @Published fileprivate(set) var angle = 0.0
-    @Published fileprivate(set) var previewImage: CGImage?
+    @Published fileprivate(set) var previewFrame: PreviewRenderer.Frame?
 }
 
 /// 보정, 배치, 실제 보호, 입력 중단 정책을 소유함. 화면 표시 상태는 흐름 함수로만 바뀜.
@@ -138,8 +138,8 @@ final class AppModel: ObservableObject {
         lastTick = clock.now
         activity.onActivity = { [weak self] value in self?.receiveActivity(value) }
         restoreSettings()
-        previewRenderer.onFrame = { [weak self] frame in self?.readout.previewImage = frame.image }
-        previewRenderer.onFailure = { [weak self] in self?.readout.previewImage = nil }
+        previewRenderer.onFrame = { [weak self] frame in self?.readout.previewFrame = frame }
+        previewRenderer.onFailure = { [weak self] in self?.readout.previewFrame = nil }
         refreshDisplays()
         motion.onSample = { [weak self] value in self?.receive(value) }
         motion.onError = { [weak self] error in self?.invalidateMotion(error) }
