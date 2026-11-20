@@ -242,7 +242,7 @@ private func linear(id: UInt32, _ low: Double, _ high: Double, elevation: Closed
 }
 
 @MainActor
-@Test func awayOrMissingInputKeepsFullNativeBlurEvenWhenTheGazeMaskWasAlreadyFull() async throws {
+@Test func lateOrMissingInputKeepsFullNativeBlurEvenWhenTheGazeMaskWasAlreadyFull() async throws {
     try await withSwimSheets { sheets in
         let lookingAway = RenderSettings.hinge(angle: 65)
         let clock = SwimWaterClock()
@@ -252,9 +252,9 @@ private func linear(id: UInt32, _ low: Double, _ high: Double, elevation: Closed
         #expect(view.showsSwim)
         try view.update(.covered())
         #expect(!view.showsSwim && view.maskImage === fullMask && clock.listenerCount == 0)
-        var away = lookingAway
-        away.coverage = 1
-        try view.update(away)
+        var late = lookingAway
+        late.coverage = 1
+        try view.update(late)
         #expect(!view.showsSwim && view.maskImage === fullMask && clock.listenerCount == 0)
         try view.update(lookingAway)
         #expect(view.showsSwim && view.maskImage === fullMask)

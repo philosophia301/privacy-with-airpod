@@ -382,10 +382,10 @@ final class SwimOverlay {
         for bank in banks { layer.addSublayer(bank.actor) }
     }
 
-    /// 자리 비움 가림은 바다를 흐리게 하고 바다 자리는 시선 기준 설정에서 정함.
+    /// 전체 블러 쪽 가림(늦은 입력)은 바다를 흐리게 하고 바다 자리는 시선 기준 설정에서 정함.
     func update(settings: RenderSettings, size: CGSize) {
-        let away = settings.coverage.isFinite ? min(1, max(0, settings.coverage)) : 1
-        let opacity: Float = if case .covered = settings.field { 0 } else { Float(1 - away) }
+        let cover = settings.coverage.isFinite ? min(1, max(0, settings.coverage)) : 1
+        let opacity: Float = if case .covered = settings.field { 0 } else { Float(1 - cover) }
         let stage = opacity > 0 ? SwimStage(settings: settings, size: size) : nil
         CATransaction.begin()
         CATransaction.setDisableActions(true)

@@ -62,26 +62,16 @@ struct SettingsMemoryFlowTests {
         #expect(h.model.connectionWidth == 25)
         #expect(h.model.responseTime == 0.18)
         #expect(!h.model.retainBlurOnInputLoss)
-        #expect(h.model.hideWhenAway)
         #expect(h.model.armLengthCM == 53.012)
         #expect(h.model.armGuide == .female)
         #expect(h.model.appliedPoses.isEmpty)
     }
 
-    @Test func turnedOffAwaySwitchSurvivesRelaunch() throws {
+    /// 자리 이탈 스위치가 있던 개발 판(2026-11-12~20)이 남긴 hideWhenAway 키는 무시하고 나머지 값을 되살림.
+    @Test func settingsSavedWithTheRemovedAwaySwitchKeepTheirValues() throws {
         let h = try ProtectionHarness()
         defer { h.tearDown() }
-        h.model.hideWhenAway = false
-
-        let again = h.relaunch()
-        #expect(!again.hideWhenAway)
-    }
-
-    /// hideWhenAway 키가 없던 이전 형식은 나머지 값을 그대로 되살리고 자리 이탈 스위치는 켜짐으로 읽어야 함.
-    @Test func settingsSavedBeforeTheAwaySwitchKeepTheirValuesAndDefaultToOn() throws {
-        let h = try ProtectionHarness()
-        defer { h.tearDown() }
-        h.defaults.set(Data(#"{"startAngle":20,"maximumBlur":50,"connectionWidth":10,"responseTime":0.3,"retainBlurOnInputLoss":true,"armLengthCM":70,"armGuide":"male"}"#.utf8),
+        h.defaults.set(Data(#"{"startAngle":20,"maximumBlur":50,"connectionWidth":10,"responseTime":0.3,"retainBlurOnInputLoss":true,"hideWhenAway":false,"armLengthCM":70,"armGuide":"male"}"#.utf8),
                        forKey: SettingsMemory.settingsKey)
 
         let again = h.relaunch()
@@ -92,7 +82,6 @@ struct SettingsMemoryFlowTests {
         #expect(again.retainBlurOnInputLoss)
         #expect(again.armLengthCM == 70)
         #expect(again.armGuide == .male)
-        #expect(again.hideWhenAway)
     }
 
     @Test func settingsAndArmLengthSurviveRelaunch() throws {

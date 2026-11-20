@@ -23,7 +23,7 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSMotionUsageDescription</key>
-	<string>고개 방향에 따라 화면을 흐리게 하고 자리 이탈 실험을 위해 AirPods 움직임을 사용합니다.</string>
+	<string>고개 방향에 따라 화면을 흐리게 하려고 AirPods 움직임을 사용합니다.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>SUEnableAutomaticChecks</key>

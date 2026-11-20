@@ -122,8 +122,8 @@ enum RecordFormat {
 
 // MARK: - 앱 규칙 재현
 
-/// AppModel의 자리 비움 규칙(receiveActivity, trackPosture, advanceAway, resumeProtection)을 시간 입력만 바꿔 옮긴 것임.
-/// AppModel의 규칙이나 AwayTiming 값이 바뀌면 여기도 맞춰야 함. 보호, 입력 중단, 스위치 상태는 기록 중 늘 켜진 것으로 봄.
+/// 앱에서 빼기 전(커밋 d993e5c) AppModel의 자리 비움 규칙(receiveActivity, trackPosture, advanceAway, resumeProtection)을
+/// 시간 입력만 바꿔 옮긴 것임. 고도화에서 앱에 다시 넣을 때 기준 구현으로 씀. 보호, 입력 중단, 스위치 상태는 기록 중 늘 켜진 것으로 봄.
 struct AwayRule {
     struct Timing: Equatable, Codable {
         var standingDelay = 3.0

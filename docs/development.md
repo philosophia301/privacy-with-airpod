@@ -871,6 +871,8 @@ Cmd+Tab이 Space를 옮기려면 시스템 설정의 '응용 프로그램 전환
 
 ## 자리 이탈 감지 — 2026-11-12
 
+2026-11-20 사용자 결정으로 앱에서 뺐음([spec](spec.md#자리-이탈-감지-제외--2026-11-20-사용자-결정), ROADMAP 단위 6). 아래 구성과 흐름은 빠지기 전 커밋 `d993e5c` 기준이며, `SeatPresence`와 실측 도구는 고도화를 위해 남김.
+
 사용자 결정은 [spec](spec.md#자리-이탈-감지--2026-11-12-사용자-결정)이 소유함. 이 절은 판정 방식, 기준값, 검증을 기록함. 기준값은 실제 AirPods 기록 두 번으로 고른 값이며, 세 번째 기록으로 확인하기 전까지 검증된 값으로 보지 않음.
 
 ### 구성
@@ -998,7 +1000,7 @@ replay: CSV → SeatPresence(기준값 인자) + 앱 자리 비움 규칙 재현
 - 원인(코드와 시험 판으로 확인함): 일어선 지 2초 안팎에 앉으면 짝 규칙이 앉음을 지움. 일어섬을 판정한 뒤에도 같은 상승이 이어지며 `upMemory`에 쌓이고, 앉음 후보 조건이 `-velocity - 0.8 × upMemory ≥ 0.22`라서 그 상승이 뒤의 하강을 상쇄함. 전환을 일으킨 쪽 속도는 부호가 바뀔 때까지 반대쪽 기억에 넣지 않는 시험 판으로 다시 돌리면 quick-stand-sit은 맞음이 되고 2차 사건은 그대로임. 1차는 일어섬과 앉음이 하나씩 더 잡힘(1차 단계 판정은 근거로 쓰지 않음). 다만 half-stand-1의 반쯤 일어섬을 일어섬으로 잡고 앉음을 놓쳐, 3차 요약은 맞음 5, 잘못 가림 1로만 바뀜. 저장소의 판정 코드는 바꾸지 않았음.
 - 원인(추론): 바닥 짚기는 숙인 채 머무는 동안 아래쪽 기억이 줄어, 펴는 상승이 짝으로 상쇄되지 않은 것으로 보임. 걷다 바로 앉기는 걷기 직후 1.5초 동안 앉음 기준을 1.6배로 올리는 규칙에 걸린 것으로 보임(`--after-walking-factor 1.0`이면 back-after-down이 맞음). 선 채 고개 숙이기는 머리 높이 변화만 보는 판정에서 앉기와 구별되지 않음.
 - 기준값 하나로는 풀리지 않음: `--stand-speed 0.75`면 3차는 맞음 9가 되지만 2차의 일어섬 4번이 모두 사라짐. 앉은 채 움직임의 최대는 2차까지 0.27 m/s였으나 3차 바닥 짚기에서 0.70 m/s가 나와, 잡힌 가장 약한 일어섬 0.37 m/s보다 큼.
-- 다음: 조정 방향은 사람이 정함(ROADMAP 3.1).
+- 다음: 사용자가 결과를 보고 자리 이탈 감지를 0.1.6에서 아예 빼고 추후 고도화하기로 함(2026-11-20, ROADMAP 단위 6).
 
 ### 검증 기록
 
@@ -1008,6 +1010,7 @@ replay: CSV → SeatPresence(기준값 인자) + 앱 자리 비움 규칙 재현
 - 2026-11-13: 자리를 뜨는 중 입력 중단. `SeatAwayFlowTests`에 일어선 뒤와 자리 비움 중 센서 오류, 무입력 4경우, 앉은 뒤와 스위치 꺼짐의 대조, 보호를 다시 켠 뒤 설정 복귀를 더함. `swift test --build-system native` 전체 통과(123개 테스트, 10개 suite), `./scripts/build-app.sh` 조립과 strict 서명 통과. 결함 주입: 유지 조건 제거, 설정 끄기 시 해제 가드 제거, 보호 끌 때 값 초기화 제거가 각각 시험 실패로 잡힘.
 - 2026-11-13: 실측 도구. `build-seat-recorder.py`로 빌드와 개발 서명(`codesign --verify --strict`)을 확인함. AirPods 입력 없이 `record --wait 3`은 안내 뒤 종료 코드 69로 끝나고 파일을 만들지 않음. 입력 전 Ctrl+C도 파일 없이 끝남. 합성 기록 replay에서 기본값은 12단계가 맞음이고 걷다 바로 앉기만 못 돌아옴이며, `--stand-level 0.5`는 일어서기 3회를 놓침으로 바꿈. `test-seat-recorder.py` 7개 통과. 결함 주입(걷기 신뢰도 조건, 앉음 복귀, 3초 대기)이 각각 시험 실패로 잡힘. `record --simulate --repeat 1`로 기록 경로를 끝까지 돌려 실시간 보고와 그 파일의 replay 보고가 같음을 확인함. 처음 돌린 판에서는 한 주기 안에서 먼저 읽은 시각으로 단계 행을 늦게 써 replay가 파일을 거부해, 받은 시각을 쓰는 순간에 읽게 고침. review flow(`flow-20261112T154707Z-d3b027`)가 짚은 끝에서만 파일에 쓰는 문제, `AppModel.receive`와 다른 표본 처리, 허용 창 대기, 문서의 보관 문장을 고침. 1초마다 파일에 써서 SIGTERM과 SIGHUP은 보고와 종료 코드 130, SIGKILL은 그때까지의 기록이 replay됨을 확인함.
 - 2026-11-13: 부호 수정과 측정 순서. `SeatPresenceTests`, `InertialProbeTests`, `ProtectionHarness`, 합성 기록의 입력을 Core Motion 관례로 바꿈. 1차 기록 replay의 첫 일어섬이 고치기 전 -52cm, 고친 뒤 +52cm임을 같은 인자로 비교함. `swift test --build-system native` 전체 통과(123개 테스트, 10개 suite, XCTest 6개). 결함 주입: 제품 부호만 예전으로 되돌리면 `SeatAwayFlowTests` 등에서 50건이 실패함. `test-seat-recorder.py` 8개 통과(`--quick` 순서 시험을 더함). 음성을 `say -o`로 파일에만 쓰고 합성 입력도 음성을 기다리게 바꾼 임시 판으로 `record --simulate --quick --repeat 1`을 돌려, 단계 행 간격이 단계 시간에 음성 시간(약 0.7초)을 더한 값이고 음성이 없는 끝 행은 단계 시간과 같음을 확인함.
+- 2026-11-20: 앱에서 뺌. `AppModel`의 자리 비움 흐름과 스위치, `HeadActivityService`, '보호 재개' 단추, `SeatAwayFlowTests`, `HeadActivityServiceTests`를 지우고, 늦은 입력 가림은 `AppModel.lateFadeDuration`(0.5초)으로 옮김. 개발 판이 저장한 `hideWhenAway` 키가 있어도 나머지 설정을 되살리는 시험을 더함. `swift test --build-system native` 전체 통과(123개 테스트, 9개 suite, XCTest 6개). `SeatPresenceTests`와 `test-seat-recorder.py` 11개는 그대로 통과함.
 - 2026-11-13: 판정 재설계. research flow(`flow-20261113T013954Z-08dddb`)가 후보 다섯과 정답 점검을 돌렸고 세션이 harness로 다시 셈. development flow(`flow-20261113T020836Z-e8546e`)가 네 단위로 구현하고 리뷰 결과 10건 중 8건을 고침(1건 문제 아님, 1건 반박됨). agent sandbox는 빌드가 막혀 세션에서 확인함. `SeatPresence`를 시제품 코드와 함께 두 기록에 그대로 넣어 일어섬과 앉음 시각이 모두 같음(1차 10건, 2차 8건). `swift test --build-system native` 전체 통과(132개 테스트, 10개 suite, XCTest 6개). 결함 주입: 앉음 확인 중 보류를 빼면 `sittingDownWithinThreeSecondsDoesNotCover`, 짝 비율을 0으로 두면 숙였다 펴기 e2e와 단위 시험 4경우, 앉음 확인 시간을 0으로 두면 단위 시험 2개가 실패함. 리뷰 뒤 공백 처리, 걷는 중 판정 중지, 불응기, 거꾸로 간 시각을 가르는 시험을 더함. `test-seat-recorder.py` 10개 통과. `record --simulate --no-voice --quick --repeat 1`의 실시간 보고와 그 파일의 replay 요약이 같음(맞음 5). 단계 행을 음성 시작 때 쓰는 고침은 실제 음성으로는 돌리지 않음.
 
 ### 남은 위험
@@ -1021,7 +1024,7 @@ replay: CSV → SeatPresence(기준값 인자) + 앱 자리 비움 규칙 재현
   - 2차의 센서 시각은 끊기지 않았고(최대 간격 0.22초) 도착만 몰려서 옴(최대 도착 간격 1.12초). 센서가 멈춘 것이 아니라 AirPods에서 프로그램까지 오는 길에서 쌓였다가 한꺼번에 온 모양임. 늦음은 시작 뒤 6~56초와 117~128초에 몰림. 블루투스 혼잡인지 기록 도구 쪽 지연인지는 이 기록만으로 가릴 수 없음.
   - 같은 기록을 도착 시각과 센서 시각의 차로 세면 0.75초를 넘는 표본은 367개임(위 2차 절의 426개는 다른 셈 방식으로 보이며 이번에 다시 세지 않았음).
   - 기준별 2차 기록의 중단 판정: 1.0초 8번, 1.5초 2번, 2.0초 0번(여유 0.29초), 2.5초 0번(여유 0.79초). 지연과 실제 탈착을 가르는 처리안은 사람이 정함(ROADMAP 3.8).
-  - 2026-11-20 구현(사용자가 안 A를 고름): `HeadSample.onTimeAge` 0.75초 안은 제때 옴, `HeadSample.lossAge` 2.5초 안은 살아 있음(`isAlive`)으로 봄. `AppModel`은 `inputLate`인 동안 `lateCoverage`를 `AwayTiming.fadeDuration`(0.5초)에 걸쳐 1로 올리고, 실제 보호 값은 `max(awayCoverage, lateCoverage)`로 덮음. 제때 온 입력이 오면 다음 주기에 0으로 돌림. `receive`와 `tick`의 중단 판정, `canProtect`, 준비 항목은 `inputAlive`를 보고, `calibrateDesk`만 제때 온 입력을 요구함. Blur Lab 진단 앱은 `freshnessRemaining`으로 0.75초 규칙을 그대로 씀.
+  - 2026-11-20 구현(사용자가 안 A를 고름): `HeadSample.onTimeAge` 0.75초 안은 제때 옴, `HeadSample.lossAge` 2.5초 안은 살아 있음(`isAlive`)으로 봄. `AppModel`은 `inputLate`인 동안 `lateCoverage`를 0.5초에 걸쳐 1로 올리고, 실제 보호 값은 자리 비움 가림과 큰 쪽으로 덮었음(자리 이탈 감지를 뺀 뒤에는 `lateCoverage`만 씀). 제때 온 입력이 오면 다음 주기에 0으로 돌림. `receive`와 `tick`의 중단 판정, `canProtect`, 준비 항목은 `inputAlive`를 보고, `calibrateDesk`만 제때 온 입력을 요구함. Blur Lab 진단 앱은 `freshnessRemaining`으로 0.75초 규칙을 그대로 씀.
   - 검증: `swift test --build-system native` 전체 통과(146개 테스트, 10개 suite, XCTest 6개). 새 e2e `lateInputFadesToFullBlurAndOnTimeInputReturnsWithoutRecalibrating`은 기본 설정에서 1.35초 침묵과 0.9초 늦은 표본 동안 보호와 책상 기준이 남고 마스크가 [255, 255, 255]까지 덮였다가, 제때 온 표본 하나로 [0, 0, 0]에 돌아오고 45°에서 [255, 255, 0]이 되는지 봄. `lateInputCannotSetTheDeskReference`는 늦은 입력에서 정면 맞추기가 거부되는지 봄. 결함 주입: `lossAge`를 0.75초로 되돌리면 두 시험이 모두 실패함(첫 시험은 8곳). 기존 중단 시험은 침묵을 `fallSilent()`(2.55초), 오래된 표본을 3초로 바꿈.
   - 2026-11-20 후속(3.1 준비): `seat-recorder` replay에 앱 기준 입력 나이를 넣다가 2차 기록에서 센서 시각이 받은 시각보다 앞선 표본 59개(최대 0.01초, 시작 뒤 120.7~128초)를 찾음. 앱은 나이가 음수인 표본을 깨진 입력으로 보고 `invalidateMotion`을 불러, 0.75초 규칙이든 2.5초 규칙이든 2차 상황에서 120.7초에 보호를 껐을 것임(3.2 조사는 늦은 쪽만 봐서 놓쳤음). `HeadSample.clockSkew` 0.1초 안의 앞선 시각은 나이 0으로 받게 고침. 시험 `sensorClockSlightlyAheadKeepsProtection`, `sensorClockSlightlyAheadOfTheMacIsStillOnTime`을 더함. `clockSkew`를 0으로 두면 두 시험이 실패함. 전체 148개 테스트 통과.
   - 고친 replay로 다시 셈: 1차는 가장 늦을 때 0.38초, 지연 0번, 중단 0번. 2차는 가장 늦을 때 1.71초, 지연 31번(합 7.7초), 앱 기준 중단 0번. 2차의 지연 31번은 연속 시간으로 센 값이라 20Hz 주기로 센 위의 22번보다 많음. `test-seat-recorder.py` 11개 통과(입력 나이 시험을 더함).
